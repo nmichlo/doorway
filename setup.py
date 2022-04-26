@@ -21,7 +21,7 @@ with open('requirements.txt', 'r') as f:
 
 
 setuptools.setup(
-    name="REPLACE",
+    name="doorway",
     author="Nathan Juraj Michlo",
     author_email="NathanJMichlo@gmail.com",
 
@@ -31,8 +31,8 @@ setuptools.setup(
 
     install_requires=install_requires,
 
-    url="https://github.com/nmichlo/REPLACE",
-    description="replace this description!",
+    url="https://github.com/nmichlo/doorway",
+    description="Essential file IO utilities",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
