@@ -198,6 +198,54 @@ def basename_from_uri(uri: str) -> str:
 
 
 # ========================================================================= #
+# URI Class                                                                 #
+# ========================================================================= #
+
+
+class Uri(object):
+
+    def __int__(self, uri: Union[str, Path]):
+        uri_norm, uri_type, validated = uri_normalize(uri=uri, return_parsed=True)
+        self._uri_norm: str = uri_norm
+        self._uri_type: UriType = uri_type
+        self._parsed: ParseResult = validated
+
+    @property
+    def uri_norm(self) -> str:
+        return self._uri_norm
+
+    @property
+    def uri_type(self) -> UriType:
+        return self._uri_type
+
+    @property
+    def parsed(self) -> ParseResult:
+        return self._parsed
+
+    @property
+    def basename(self) -> str:
+        return os.path.basename(self._parsed.path)
+
+    @property
+    def uri(self) -> str:
+        return self._parsed.geturl()
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(uri={repr(self.uri)})'
+
+    def __str__(self):
+        return self.uri
+
+    @property
+    def is_file(self) -> bool:
+        return self._uri_type == UriType.FILE
+
+    @property
+    def is_url(self) -> bool:
+        return self._uri_type == UriType.URL
+
+
+# ========================================================================= #
 # export                                                                    #
 # ========================================================================= #
 
@@ -211,6 +259,7 @@ __all__ = (
     'UriType',
     'uri_normalize',
     'basename_from_uri',
+    'Uri',
 )
 
 
