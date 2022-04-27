@@ -25,9 +25,11 @@
 import logging
 import os
 from enum import Enum
+from functools import wraps
 from pathlib import Path
 from typing import Callable
 from typing import Tuple
+from typing import TypeVar
 from typing import Union
 from urllib.parse import ParseResult
 from urllib.parse import urlparse
@@ -189,12 +191,56 @@ def uri_normalize(uri: Union[str, Path], return_parsed: bool = False) -> Union[T
 # ========================================================================= #
 
 
-def basename_from_uri(uri: str) -> str:
+# def basename_from_uri(uri: str) -> str:
+#     """
+#     Get the basename from the path component of a URI
+#     """
+#     parsed = urlparse(uri)
+#     return os.path.basename(parsed.path)
+
+
+# ========================================================================= #
+# URI Class - Errors                                                        #
+# ========================================================================= #
+
+
+class UriIsIncorrectTypeError(Exception):
     """
-    Get the basename from the path component of a URI
+    This error is thrown if the uri is an incorrect type
     """
-    parsed = urlparse(uri)
-    return os.path.basename(parsed.path)
+
+
+class UriIsNotUrlError(UriIsIncorrectTypeError):
+    """
+    This error is thrown if the uri is not a url
+    """
+
+
+class UriIsNotFileError(UriIsIncorrectTypeError):
+    """
+    This error is thrown if the uri is not a url
+    """
+
+
+T = TypeVar('T')
+
+
+def is_url_only(func: T) -> T:
+    @wraps(func)
+    def wrapper(self: 'Uri', *args, **kwargs):
+        if not self.is_url:
+            raise UriIsNotUrlError(f'Check `is_url` first before calling `{func.__name__}`, the uri is not of type: {repr(UriType.URL)}, got: {repr(self.uri_type)}, for: {repr(self.uri)}')
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def is_file_only(func: T) -> T:
+    @wraps(func)
+    def wrapper(self: 'Uri', *args, **kwargs):
+        if not self.is_file:
+            raise UriIsNotFileError(f'Check `is_file` first before calling `{func.__name__}`, the uri is not of type: {repr(UriType.FILE)}, got: {repr(self.uri_type)}, for: {repr(self.uri)}')
+        return func(self, *args, **kwargs)
+    return wrapper
 
 
 # ========================================================================= #
@@ -210,6 +256,8 @@ class Uri(object):
         self._uri_type: UriType = uri_type
         self._parsed: ParseResult = validated
 
+    # ~=~=~ URI ~=~=~ #
+
     @property
     def uri_norm(self) -> str:
         return self._uri_norm
@@ -219,11 +267,11 @@ class Uri(object):
         return self._uri_type
 
     @property
-    def parsed(self) -> ParseResult:
+    def uri_parsed(self) -> ParseResult:
         return self._parsed
 
     @property
-    def basename(self) -> str:
+    def uri_basename(self) -> str:
         return os.path.basename(self._parsed.path)
 
     @property
@@ -236,13 +284,62 @@ class Uri(object):
     def __str__(self):
         return self.uri
 
+    # ~=~=~ FILE ~=~=~ #
+
     @property
     def is_file(self) -> bool:
         return self._uri_type == UriType.FILE
 
     @property
+    @is_file_only
+    def file_is_abs(self) -> bool:
+        return os.path.isabs(self.uri_norm)
+
+    @property
+    @is_file_only
+    def file_is_rel(self) -> bool:
+        return not os.path.isabs(self.uri_norm)
+
+    @property
+    @is_file_only
+    def file(self) -> str:
+        return self.uri_norm
+
+    @property
+    @is_file_only
+    def file_abs(self) -> str:
+        return os.path.abspath(self.file)
+
+    @property
+    @is_file_only
+    def path(self) -> Path:
+        return Path(self.uri_norm)
+
+    @property
+    @is_file_only
+    def path_abs(self) -> Path:
+        return Path(self.uri_norm).absolute()
+
+    # ~=~=~ URI ~=~=~ #
+
+    @property
     def is_url(self) -> bool:
         return self._uri_type == UriType.URL
+
+    @property
+    @is_url_only
+    def url_is_http(self) -> bool:
+        return self._parsed.scheme == 'http'
+
+    @property
+    @is_url_only
+    def url_is_https(self) -> bool:
+        return self._parsed.scheme == 'https'
+
+    @property
+    @is_url_only
+    def url(self) -> str:
+        return self.uri_norm
 
 
 # ========================================================================= #
@@ -251,14 +348,19 @@ class Uri(object):
 
 
 __all__ = (
+    # errors
     'UriMalformedException',
     'UriMalformedFileException',
     'UriMalformedUrlException',
+    'UriIsIncorrectTypeError',
+    'UriIsNotUrlError',
+    'UriIsNotFileError',
+    # functions
     'uri_validate',
     'uri_is_valid',
     'UriType',
     'uri_normalize',
-    'basename_from_uri',
+    # class
     'Uri',
 )
 
