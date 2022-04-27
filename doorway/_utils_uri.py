@@ -31,8 +31,8 @@ from typing import Callable
 from typing import Tuple
 from typing import TypeVar
 from typing import Union
-from urllib.parse import ParseResult
-from urllib.parse import urlparse
+from rfc3986 import urlparse
+from rfc3986 import ParseResult
 
 
 LOG = logging.getLogger(__name__)
@@ -69,10 +69,8 @@ def _validate_url(parsed: ParseResult) -> ParseResult:
     #     raise MalformedUriUrlException(parsed, f'must contain query')
     # if parsed.fragment:
     #     raise MalformedUriUrlException(parsed, f'must contain fragment')
-    if parsed.username:
-        raise UriMalformedUrlException(parsed, f'cannot contain username')
-    if parsed.password:
-        raise UriMalformedUrlException(parsed, f'cannot contain password')
+    if parsed.userinfo:
+        raise UriMalformedUrlException(parsed, f'cannot contain userinfo')
     if not parsed.hostname:
         raise UriMalformedUrlException(parsed, f'must contain hostname')
     # if not parsed.port:
@@ -81,10 +79,10 @@ def _validate_url(parsed: ParseResult) -> ParseResult:
 
 
 def _validate_file(parsed: ParseResult) -> ParseResult:
-    if parsed.scheme != 'file':
+    if parsed.scheme not in ('file', None):
         raise UriMalformedFileException(parsed, f'scheme must be "file"')
     if parsed.netloc:
-        raise UriMalformedFileException(parsed, f'cannot contain netloc')
+        raise UriMalformedFileException(parsed, f'cannot contain netloc. A file with two forward slashes "file://path" is invalid, must have one "file:/path" or three "file:///path"')
     if not parsed.path:
         raise UriMalformedFileException(parsed, f'must contain path')
     if parsed.params:
@@ -93,14 +91,30 @@ def _validate_file(parsed: ParseResult) -> ParseResult:
         raise UriMalformedFileException(parsed, f'cannot contain query')
     if parsed.fragment:
         raise UriMalformedFileException(parsed, f'cannot contain fragment')
-    if parsed.username:
-        raise UriMalformedFileException(parsed, f'cannot contain username')
-    if parsed.password:
-        raise UriMalformedFileException(parsed, f'cannot contain password')
+    if parsed.userinfo:
+        raise UriMalformedFileException(parsed, f'cannot contain userinfo')
     if parsed.hostname:
         raise UriMalformedFileException(parsed, f'cannot contain hostname')
     if parsed.port:
         raise UriMalformedFileException(parsed, f'cannot contain port')
+    # path is correct, but the uri is not!
+    # builtin urlparse is buggy when parsing files and does not follow standards!
+    #   * urlparse('folder/name.ext').geturl()           -> 'folder/name.ext'           # CORRECT
+    #   * urlparse('/folder/name.ext').geturl()          -> '/folder/name.ext'          # CORRECT
+    #   * urlparse('file:folder/name.ext').geturl()      -> 'file:///folder/name.ext'   # ERROR -- should be unchanged
+    #   * urlparse('file:/folder/name.ext').geturl()     -> 'file:///folder/name.ext'   # CORRECT
+    #   * urlparse('file:///folder/name.ext').geturl()   -> 'file:///folder/name.ext'   # CORRECT
+    #   * urlparse('./folder/name.ext').geturl()         -> './folder/name.ext'         # CORRECT
+    #   * urlparse('file:./folder/name.ext').geturl()    -> 'file:///./folder/name.ext' # OK - BUT NOT A URL
+    #   * urlparse('file:/./folder/name.ext').geturl()   -> 'file:///./folder/name.ext' # OK - BUT NOT A URL
+    #   * urlparse('file://./folder/name.ext').geturl()  -> 'file://./folder/name.ext'  # INCORRECT
+    #   * urlparse('file:///./folder/name.ext').geturl() -> 'file://./folder/name.ext'  # OK - BUT NOT A URL
+    # CONCLUSION:
+    #   1. only use absolute urls with "file:*"
+    #   2. make sure relative urls start with a "./"
+    if (parsed.scheme == 'file') and not os.path.abspath(parsed.path):
+        raise UriMalformedFileException(parsed, 'path must be absolute if "file:" scheme is used')
+    # return result
     return parsed
 
 
@@ -108,6 +122,7 @@ _SCHEME_VALIDATORS = {
     'http': _validate_url,
     'https': _validate_url,
     'file': _validate_file,
+    None:   _validate_file,
 }
 
 
@@ -119,7 +134,7 @@ def _uri_get_validator(parsed: ParseResult) -> Callable[[ParseResult], ParseResu
 
 
 def uri_validate(uri: Union[str, Path]) -> ParseResult:
-    parsed = urlparse(uri, scheme='file')  # default scheme if none is given
+    parsed = urlparse(uri)
     # get the validator & validate the uri
     validator = _uri_get_validator(parsed)
     validated = validator(parsed)
@@ -152,9 +167,10 @@ class UriType(Enum):
 
 
 _SCHEME_TO_TYPE = {
-    'http': UriType.URL,
+    'http':  UriType.URL,
     'https': UriType.URL,
-    'file': UriType.FILE,
+    'file':  UriType.FILE,
+    None:    UriType.FILE,
 }
 
 
@@ -229,7 +245,7 @@ def is_url_only(func: T) -> T:
     @wraps(func)
     def wrapper(self: 'Uri', *args, **kwargs):
         if not self.is_url:
-            raise UriIsNotUrlError(f'Check `is_url` first before calling `{func.__name__}`, the uri is not of type: {repr(UriType.URL)}, got: {repr(self.uri_type)}, for: {repr(self.uri)}')
+            raise UriIsNotUrlError(f'Check `is_url` first before calling `{func.__name__}`, the uri is not of type: `{UriType.URL}`, instead got: `{self.uri_type}`, for: {repr(self.uri)}')
         return func(self, *args, **kwargs)
     return wrapper
 
@@ -238,7 +254,7 @@ def is_file_only(func: T) -> T:
     @wraps(func)
     def wrapper(self: 'Uri', *args, **kwargs):
         if not self.is_file:
-            raise UriIsNotFileError(f'Check `is_file` first before calling `{func.__name__}`, the uri is not of type: {repr(UriType.FILE)}, got: {repr(self.uri_type)}, for: {repr(self.uri)}')
+            raise UriIsNotFileError(f'Check `is_file` first before calling `{func.__name__}`, the uri is not of type: `{UriType.FILE}`, instead got: `{self.uri_type}`, for: {repr(self.uri)}')
         return func(self, *args, **kwargs)
     return wrapper
 
@@ -250,7 +266,8 @@ def is_file_only(func: T) -> T:
 
 class Uri(object):
 
-    def __int__(self, uri: Union[str, Path]):
+    def __init__(self, uri: Union[str, Path]):
+        self._orig_uri = uri
         uri_norm, uri_type, validated = uri_normalize(uri=uri, return_parsed=True)
         self._uri_norm: str = uri_norm
         self._uri_type: UriType = uri_type
@@ -279,10 +296,10 @@ class Uri(object):
         return self._parsed.geturl()
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(uri={repr(self.uri)})'
+        return f'{self.__class__.__name__}(uri={repr(self._orig_uri)})'
 
     def __str__(self):
-        return self.uri
+        return self._orig_uri
 
     # ~=~=~ FILE ~=~=~ #
 
