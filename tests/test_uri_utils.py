@@ -24,9 +24,9 @@
 
 import pytest
 
-from doorway import UriMalformedFileException
-from doorway import UriMalformedUrlException
-from doorway import UriType
+from doorway import UriMalformedException
+from doorway import EnumUriType
+from doorway import uri_parse
 from doorway import uri_validate
 
 
@@ -36,28 +36,28 @@ from doorway import uri_validate
 
 
 def test_uri_type_enum():
-    assert len(UriType) == 2
-    assert list(UriType) == [UriType.FILE, UriType.URL]
+    assert len(EnumUriType) == 2
+    assert list(EnumUriType) == [EnumUriType.FILE, EnumUriType.URL]
     # test types
-    assert isinstance(UriType.FILE, UriType)
-    assert isinstance(UriType.FILE.value, str)
-    assert isinstance(UriType.FILE.name, str)
+    assert isinstance(EnumUriType.FILE, EnumUriType)
+    assert isinstance(EnumUriType.FILE.value, str)
+    assert isinstance(EnumUriType.FILE.name, str)
     # make sure the inverse is not true
-    assert not isinstance(UriType.FILE, str)
-    assert not isinstance(UriType.FILE.value, UriType)
-    assert not isinstance(UriType.FILE.name, UriType)
+    assert not isinstance(EnumUriType.FILE, str)
+    assert not isinstance(EnumUriType.FILE.value, EnumUriType)
+    assert not isinstance(EnumUriType.FILE.name, EnumUriType)
     # test equivalence
-    assert UriType.FILE == UriType.FILE
-    assert UriType.FILE != UriType.URL
-    assert UriType.URL  == UriType.URL
+    assert EnumUriType.FILE == EnumUriType.FILE
+    assert EnumUriType.FILE != EnumUriType.URL
+    assert EnumUriType.URL == EnumUriType.URL
     # check enums are not equal to their values
-    assert UriType.FILE != UriType.FILE.value
-    assert UriType.FILE != UriType.FILE.name
-    assert UriType.URL != UriType.URL.value
-    assert UriType.URL != UriType.URL.name
+    assert EnumUriType.FILE != EnumUriType.FILE.value
+    assert EnumUriType.FILE != EnumUriType.FILE.name
+    assert EnumUriType.URL != EnumUriType.URL.value
+    assert EnumUriType.URL != EnumUriType.URL.name
     # check names and values are equivalent
-    assert UriType.FILE.name == UriType.FILE.value
-    assert UriType.URL.name == UriType.URL.value
+    assert EnumUriType.FILE.name == EnumUriType.FILE.value
+    assert EnumUriType.URL.name == EnumUriType.URL.value
 
 
 def test_filename_from_uri():
@@ -68,15 +68,16 @@ def test_filename_from_uri():
     uri_validate('/basename.ext/path')
     uri_validate('./basename.ext/path')
     uri_validate('/')
+    uri_validate('./')
     uri_validate('.')
-    with pytest.raises(UriMalformedFileException, match='must contain path'): uri_validate('')
+    with pytest.raises(UriMalformedException, match="field 'path' is required, but got value: None"): uri_validate('')
 
     # test basic urls
     uri_validate('http://prefix/basename.ext/suffix')
     uri_validate('http://basename.ext/suffix')
     uri_validate('HTTP://basename.ext/suffix')
-    with pytest.raises(UriMalformedUrlException, match='must contain netloc'): uri_validate('http:/basename.ext/suffix')
-    with pytest.raises(UriMalformedUrlException, match='must contain netloc'): uri_validate('http:///basename.ext/suffix')
+    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: None"): uri_validate('http:/basename.ext/suffix')
+    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: None"): uri_validate('http:///basename.ext/suffix')
 
     # test url ports
     uri_validate('http://localhost:')
@@ -86,16 +87,52 @@ def test_filename_from_uri():
     uri_validate('http://192.168.0.1')
     uri_validate('http://192.168.0.1:')
     uri_validate('http://192.168.0.1:3000')
-    with pytest.raises(UriMalformedUrlException, match='must contain hostname'): uri_validate('http://:3000')
+    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: ''"): uri_validate('http://:3000')
 
     # test urls and fragments etc
     uri_validate('http://basename.ext/suffix?query')
     uri_validate('http://basename.ext/suffix#fragment')
     uri_validate('http://basename.ext/suffix?query#fragment')
     uri_validate('http://basename.ext/suffix?query=5&query2=3#fragment')
-    with pytest.raises(UriMalformedUrlException, match='cannot contain params'): uri_validate('http://basename.ext/suffix;params?query=5&query2=3#fragment')
+    uri_validate('http://basename.ext/suffix;params?query=5&query2=3#fragment')
     uri_validate('http://basename.ext/suffix#fragment?query')
     uri_validate('http://basename.ext/suffix#fragment?query')
+
+
+def test_uri_paths_alt():
+
+    def uri(inp, targ=None):
+        targ = inp if (targ is None) else targ
+        assert uri_parse(inp).geturl() == targ
+
+    uri(inp='path/uri_kind.ext')
+    uri(inp='/path/uri_kind.ext')
+
+    uri(inp='../path/uri_kind.ext')
+    uri(inp='..//path/uri_kind.ext', targ='../path/uri_kind.ext')
+    uri(inp='..//path//uri_kind.ext', targ='../path/uri_kind.ext')
+
+    uri(inp='../../path//uri_kind.ext', targ='../../path/uri_kind.ext')
+    uri(inp='../path/..//uri_kind.ext', targ='../uri_kind.ext')
+
+    uri(inp='file:/path/uri_kind.ext')
+    uri(inp='file:/path/uri_kind.ext')
+    uri(inp='file:/./path/uri_kind.ext', targ='file:/path/uri_kind.ext')
+
+    uri(inp='./path/uri_kind.ext', targ='path/uri_kind.ext')
+    uri(inp='file:path/uri_kind.ext')
+    uri(inp='file:./path/uri_kind.ext', targ='file:path/uri_kind.ext')
+    uri(inp='file:.//path/uri_kind.ext', targ='file:path/uri_kind.ext')
+    uri(inp='file:.//.//path/uri_kind.ext', targ='file:path/uri_kind.ext')
+
+    uri(inp='file://path/uri_kind.ext', targ='file://path/uri_kind.ext')    # ERROR?
+    uri(inp='file://path/uri_kind.ext')                                     # ERROR?
+    uri(inp='file:///path/uri_kind.ext', targ='file:/path/uri_kind.ext')    # ERROR?
+    uri(inp='file://./path/uri_kind.ext')                                   # ERROR?
+    uri(inp='file:////path/uri_kind.ext', targ='file://path/uri_kind.ext')  # ERROR?
+    uri(inp='file:///./path/uri_kind.ext', targ='file:/path/uri_kind.ext')  # ERROR?
+
+    uri(inp='http://google.com/asdf')
 
 
 # ========================================================================= #

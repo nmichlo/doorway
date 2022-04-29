@@ -24,18 +24,48 @@
 
 import logging
 import os
+from contextlib import contextmanager
 from enum import Enum
 from functools import wraps
 from pathlib import Path
+from typing import Any
 from typing import Callable
+from typing import Dict
+from typing import NoReturn
+from typing import Optional
+from typing import Sequence
 from typing import Tuple
 from typing import TypeVar
 from typing import Union
-from rfc3986 import urlparse
+
+from rfc3986 import normalizers
 from rfc3986 import ParseResult
 
 
 LOG = logging.getLogger(__name__)
+
+
+# ========================================================================= #
+# PATCH                                                                     #
+# ========================================================================= #
+
+
+_ORIG_REMOVE_DOT_SEGMENTS = normalizers.remove_dot_segments
+
+
+@contextmanager
+def _rfc3986_patch_context__remove_dot_segments(disabled=False):
+    # set new function, this no longer matches: http://tools.ietf.org/html/rfc3986#section-5.2.4
+    # -- make sure that '..' and '.' at the start of a path are not removed!
+    # -- '' might become '.' which should actually not be allowed!
+    if not disabled:
+        normalizers.remove_dot_segments = os.path.normpath
+    # move into context
+    try:
+        yield
+    # restore original function
+    finally:
+        normalizers.remove_dot_segments = _ORIG_REMOVE_DOT_SEGMENTS
 
 
 # ========================================================================= #
@@ -45,112 +75,92 @@ LOG = logging.getLogger(__name__)
 
 class UriMalformedException(Exception):
     def __init__(self, parsed: ParseResult, msg: str):
-        super().__init__(f'[Malformed URI]: {msg} -- From URI: {parsed.geturl()}')
+        super().__init__(f'[Malformed URI]: {msg} -- From URI: {parsed.unsplit()}')
 
 
-class UriMalformedFileException(UriMalformedException):
-    pass
+class EnumValMode(Enum):
+    OPTIONAL = 'OPTIONAL'
+    REQUIRED = 'REQUIRED'
+    FORBIDDEN = 'FORBIDDEN'
 
 
-class UriMalformedUrlException(UriMalformedException):
-    pass
+class UriFieldValidator(object):
+    def __init__(
+        self,
+        mode: EnumValMode = EnumValMode.OPTIONAL,
+        validator: Callable[[ParseResult, str, str, Any], ParseResult] = None,
+        one_of: Optional[Sequence[Any]] = None,
+    ):
+        self._mode = mode
+        self._validator = validator
+        self._one_of = one_of
+
+    def __call__(self, parsed: ParseResult, uri_kind: str, field_name: str, field_value: Any) -> NoReturn:
+        # validate based on the mode
+        if self._mode == EnumValMode.REQUIRED:
+            if not field_value:
+                raise UriMalformedException(parsed, f'field {repr(field_name)} is required, but got value: {repr(field_value)}')
+        elif self._mode == EnumValMode.FORBIDDEN:
+            if field_value:
+                raise UriMalformedException(parsed, f'field {repr(field_name)} is forbidden, but got value: {repr(field_value)}')
+        elif self._mode != EnumValMode.OPTIONAL:
+            raise NotImplementedError('This should never happen!')
+        # validate based on required values
+        if self._one_of is not None:
+            if field_value not in self._one_of:
+                raise UriMalformedException(parsed, f'field {repr(field_name)} has value: {repr(field_value)}, but must be one of: {list(self._one_of)}')
+        # validate based on the validator function
+        if self._validator is not None:
+            self._validator(parsed, uri_kind, field_name, field_value)
 
 
-def _validate_url(parsed: ParseResult) -> ParseResult:
-    if parsed.scheme not in ('http', 'https'):
-        raise UriMalformedUrlException(parsed, f'scheme must be "http" or "https"')
-    if not parsed.netloc:
-        raise UriMalformedUrlException(parsed, f'must contain netloc')  # netloc is a combined version of hostname and port and other vars
-    # if not parsed.path:
-    #     raise MalformedUriUrlException(parsed, f'must contain path')
-    if parsed.params:
-        raise UriMalformedUrlException(parsed, f'cannot contain params')
-    # if not parsed.query:
-    #     raise MalformedUriUrlException(parsed, f'must contain query')
-    # if parsed.fragment:
-    #     raise MalformedUriUrlException(parsed, f'must contain fragment')
-    if parsed.userinfo:
-        raise UriMalformedUrlException(parsed, f'cannot contain userinfo')
-    if not parsed.hostname:
-        raise UriMalformedUrlException(parsed, f'must contain hostname')
-    # if not parsed.port:
-    #     raise MalformedUriUrlException(parsed, f'must contain port')
-    return parsed
+class UriValidator(object):
+    # override these in subclasses
+    validate_scheme:   UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_host:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_port:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_path:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_query:    UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_fragment: UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
 
+    def __call__(self, uri: Union[str, Path]) -> ParseResult:
+        return self.validate(uri)
 
-def _validate_file(parsed: ParseResult) -> ParseResult:
-    if parsed.scheme not in ('file', None):
-        raise UriMalformedFileException(parsed, f'scheme must be "file"')
-    if parsed.netloc:
-        raise UriMalformedFileException(parsed, f'cannot contain netloc. A file with two forward slashes "file://path" is invalid, must have one "file:/path" or three "file:///path"')
-    if not parsed.path:
-        raise UriMalformedFileException(parsed, f'must contain path')
-    if parsed.params:
-        raise UriMalformedFileException(parsed, f'cannot contain params')
-    if parsed.query:
-        raise UriMalformedFileException(parsed, f'cannot contain query')
-    if parsed.fragment:
-        raise UriMalformedFileException(parsed, f'cannot contain fragment')
-    if parsed.userinfo:
-        raise UriMalformedFileException(parsed, f'cannot contain userinfo')
-    if parsed.hostname:
-        raise UriMalformedFileException(parsed, f'cannot contain hostname')
-    if parsed.port:
-        raise UriMalformedFileException(parsed, f'cannot contain port')
-    # path is correct, but the uri is not!
-    # builtin urlparse is buggy when parsing files and does not follow standards!
-    #   * urlparse('folder/name.ext').geturl()           -> 'folder/name.ext'           # CORRECT
-    #   * urlparse('/folder/name.ext').geturl()          -> '/folder/name.ext'          # CORRECT
-    #   * urlparse('file:folder/name.ext').geturl()      -> 'file:///folder/name.ext'   # ERROR -- should be unchanged
-    #   * urlparse('file:/folder/name.ext').geturl()     -> 'file:///folder/name.ext'   # CORRECT
-    #   * urlparse('file:///folder/name.ext').geturl()   -> 'file:///folder/name.ext'   # CORRECT
-    #   * urlparse('./folder/name.ext').geturl()         -> './folder/name.ext'         # CORRECT
-    #   * urlparse('file:./folder/name.ext').geturl()    -> 'file:///./folder/name.ext' # OK - BUT NOT A URL
-    #   * urlparse('file:/./folder/name.ext').geturl()   -> 'file:///./folder/name.ext' # OK - BUT NOT A URL
-    #   * urlparse('file://./folder/name.ext').geturl()  -> 'file://./folder/name.ext'  # INCORRECT
-    #   * urlparse('file:///./folder/name.ext').geturl() -> 'file://./folder/name.ext'  # OK - BUT NOT A URL
-    # CONCLUSION:
-    #   1. only use absolute urls with "file:*"
-    #   2. make sure relative urls start with a "./"
-    if (parsed.scheme == 'file') and not os.path.abspath(parsed.path):
-        raise UriMalformedFileException(parsed, 'path must be absolute if "file:" scheme is used')
-    # return result
-    return parsed
+    def validate(self, uri: Union[str, Path]) -> ParseResult:
+        parsed = uri_parse(uri)
+        # validate everything
+        self.validate_scheme  (parsed=parsed, uri_kind=self.uri_kind, field_name='scheme',   field_value=parsed.scheme)
+        self.validate_userinfo(parsed=parsed, uri_kind=self.uri_kind, field_name='userinfo', field_value=parsed.userinfo)
+        self.validate_host    (parsed=parsed, uri_kind=self.uri_kind, field_name='host',     field_value=parsed.host)
+        self.validate_port    (parsed=parsed, uri_kind=self.uri_kind, field_name='port',     field_value=parsed.port)
+        self.validate_path    (parsed=parsed, uri_kind=self.uri_kind, field_name='path',     field_value=parsed.path)
+        self.validate_query   (parsed=parsed, uri_kind=self.uri_kind, field_name='query',    field_value=parsed.query)
+        self.validate_fragment(parsed=parsed, uri_kind=self.uri_kind, field_name='fragment', field_value=parsed.fragment)
+        # final result
+        return parsed
 
+    # override these
 
-_SCHEME_VALIDATORS = {
-    'http': _validate_url,
-    'https': _validate_url,
-    'file': _validate_file,
-    None:   _validate_file,
-}
+    @property
+    def uri_kind(self) -> str:
+        raise NotImplementedError
 
+    @property
+    def uri_type(self) -> 'EnumUriType':
+        raise NotImplementedError
 
-def _uri_get_validator(parsed: ParseResult) -> Callable[[ParseResult], ParseResult]:
-    validator = _SCHEME_VALIDATORS.get(parsed.scheme, None)
-    if validator is None:
-        raise KeyError(f'invalid uri scheme: {repr(parsed.scheme)}, must be one of: {sorted(_SCHEME_VALIDATORS.keys())}, for uri: {repr(parsed.geturl())}')
-    return validator
+    @property
+    def allowed_schemes(self) -> Tuple[Optional[str], ...]:
+        raise NotImplementedError
 
-
-def uri_validate(uri: Union[str, Path]) -> ParseResult:
-    parsed = urlparse(uri)
-    # get the validator & validate the uri
-    validator = _uri_get_validator(parsed)
-    validated = validator(parsed)
-    return validated
-
-
-def uri_is_valid(uri: Union[str, Path]) -> bool:
-    try:
-        uri_validate(uri)
-    except UriMalformedException:
-        return False
-    return True
+    @classmethod
+    def extract(cls, validated: ParseResult) -> str:
+        raise NotImplementedError
 
 
 # ========================================================================= #
-# URI parsing                                                               #
+# URI Types                                                                 #
 # ========================================================================= #
 
 
@@ -158,66 +168,120 @@ def uri_is_valid(uri: Union[str, Path]) -> bool:
 # without `str` as a parent class, this does not evaluate to `True`.
 # -- HOWEVER: we do not want this feature! It will just cause confusion
 #             and can't be type checked!
-class UriType(Enum):
+class EnumUriType(Enum):
     """
     Types of URIs supported by the `parse_uri_and_type` function.
     """
     FILE = 'FILE'
     URL = 'URL'
+    S3 = 'S3'
+    SSH = 'SSH'
 
 
-_SCHEME_TO_TYPE = {
-    'http':  UriType.URL,
-    'https': UriType.URL,
-    'file':  UriType.FILE,
-    None:    UriType.FILE,
+class UriValidatorUrl(UriValidator):
+    uri_kind = 'url'
+    uri_type = EnumUriType.URL
+    allowed_schemes = ('http', 'https')
+
+    # override these in subclasses
+    validate_scheme:   UriFieldValidator = UriFieldValidator(mode=EnumValMode.REQUIRED, one_of=allowed_schemes)
+    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
+    validate_host:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.REQUIRED)
+    validate_port:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_path:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_query:    UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_fragment: UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+
+    @classmethod
+    def extract(cls, validated: ParseResult) -> str:
+        return validated.geturl()
+
+
+class UriValidatorFile(UriValidator):
+    uri_kind = 'file'
+    uri_type = EnumUriType.FILE
+    allowed_schemes = ('file', None)
+
+    # override these in subclasses
+    validate_scheme:   UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL, one_of=allowed_schemes)
+    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
+    validate_host:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
+    validate_port:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
+    validate_path:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.REQUIRED)
+    validate_query:    UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
+    validate_fragment: UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
+
+    @classmethod
+    def extract(cls, validated: ParseResult) -> str:
+        return validated.path
+
+
+# ========================================================================= #
+# URI vars                                                                  #
+# ========================================================================= #
+
+
+_SCHEME_VALIDATORS: Dict[Optional[str], UriValidator] = {
+    scheme: validate_cls()
+    for validate_cls in [UriValidatorUrl, UriValidatorFile]
+    for scheme in validate_cls.allowed_schemes
 }
 
 
-def _uri_get_type(validated: ParseResult) -> UriType:
-    result_type = _SCHEME_TO_TYPE.get(validated.scheme, None)
-    if result_type is None:
-        raise KeyError(f'invalid uri scheme: {repr(validated.scheme)}, must be one of: {sorted(_SCHEME_TO_TYPE.keys())}, for uri: {repr(validated.geturl())}')
-    return result_type
-
-
-def _uri_norm_from_type(validated: ParseResult, uri_type: UriType) -> str:
-    if uri_type == UriType.FILE:
-        uri_norm = validated.path
-    elif uri_type == UriType.URL:
-        uri_norm = validated.geturl()
-    else:
-        raise RuntimeError('This should never happen!')
-    return uri_norm
-
-
-def uri_normalize(uri: Union[str, Path], return_parsed: bool = False) -> Union[Tuple[str, UriType], Tuple[str, UriType, ParseResult]]:
-    validated = uri_validate(uri)
-    # get the uri type and get the norm string based on that type
-    uri_type = _uri_get_type(validated)
-    uri_norm = _uri_norm_from_type(validated, uri_type)
-    # return the results
-    if return_parsed:
-        return uri_norm, uri_type, validated
-    return uri_norm, uri_type
-
-
 # ========================================================================= #
-# uri helper                                                                #
+# URI validation                                                            #
 # ========================================================================= #
 
 
-# def basename_from_uri(uri: str) -> str:
-#     """
-#     Get the basename from the path component of a URI
-#     """
-#     parsed = urlparse(uri)
-#     return os.path.basename(parsed.path)
+def uri_parse(uri: Union[str, Path, ParseResult], rfc3986_norm: bool = False) -> ParseResult:
+    parsed = uri
+    # convert to parse result
+    # -- assume already normalized if already a ParseResult
+    if not isinstance(parsed, ParseResult):
+        with _rfc3986_patch_context__remove_dot_segments(disabled=rfc3986_norm):
+            parsed: ParseResult = ParseResult.from_string(str(parsed), lazy_normalize=False)
+    # done!
+    return parsed
+
+
+def uri_validate(uri: Union[str, Path], return_validator: bool = False) -> Union[ParseResult, Tuple[ParseResult, UriValidator]]:
+    parsed = uri_parse(uri)
+    # get the validator
+    validator = _SCHEME_VALIDATORS.get(parsed.scheme, None)
+    if validator is None:
+        raise KeyError(f'invalid uri scheme: {repr(parsed.scheme)}, must be one of: {list(_SCHEME_VALIDATORS.keys())}, for uri: {repr(parsed.geturl())}')
+    # validate the uri
+    validated = validator.validate(parsed)
+    # get results
+    if return_validator:
+        return validated, validator
+    return validated
+
+
+def uri_extract(
+    uri: Union[str, Path],
+    return_validated: bool = False,
+    return_validator: bool = False,
+) -> Union[str, Tuple[str, ParseResult], Tuple[str, UriValidator], Tuple[str, ParseResult, UriValidator]]:
+    validated, validator = uri_validate(uri, return_validator=True)
+    # validate the uri
+    uri_norm = validator.extract(validated)
+    # return the single result
+    if not (return_validator or return_validated):
+        return uri_norm
+    # return all the results
+    results = [uri_norm]
+    if return_validated: results.append(validated)
+    if return_validator: results.append(validator)
+    return tuple(results)
 
 
 # ========================================================================= #
 # URI Class - Errors                                                        #
 # ========================================================================= #
+
+
+T = TypeVar('T')
 
 
 class UriIsIncorrectTypeError(Exception):
@@ -226,37 +290,15 @@ class UriIsIncorrectTypeError(Exception):
     """
 
 
-class UriIsNotUrlError(UriIsIncorrectTypeError):
-    """
-    This error is thrown if the uri is not a url
-    """
-
-
-class UriIsNotFileError(UriIsIncorrectTypeError):
-    """
-    This error is thrown if the uri is not a url
-    """
-
-
-T = TypeVar('T')
-
-
-def is_url_only(func: T) -> T:
-    @wraps(func)
-    def wrapper(self: 'Uri', *args, **kwargs):
-        if not self.is_url:
-            raise UriIsNotUrlError(f'Check `is_url` first before calling `{func.__name__}`, the uri is not of type: `{UriType.URL}`, instead got: `{self.uri_type}`, for: {repr(self.uri)}')
-        return func(self, *args, **kwargs)
-    return wrapper
-
-
-def is_file_only(func: T) -> T:
-    @wraps(func)
-    def wrapper(self: 'Uri', *args, **kwargs):
-        if not self.is_file:
-            raise UriIsNotFileError(f'Check `is_file` first before calling `{func.__name__}`, the uri is not of type: `{UriType.FILE}`, instead got: `{self.uri_type}`, for: {repr(self.uri)}')
-        return func(self, *args, **kwargs)
-    return wrapper
+def only_if(prop: property) -> Callable[[T], T]:
+    def decorator(func: T) -> T:
+        @wraps(func)
+        def wrapper(self: 'Uri', *args, **kwargs):
+            if getattr(self, prop.fget.__name__):
+                raise UriIsIncorrectTypeError(f'Check if: `{prop.fget.__name__}` is `True` before calling `{func.__name__}`, got uri: {repr(self.uri)}')
+            return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ========================================================================= #
@@ -266,97 +308,114 @@ def is_file_only(func: T) -> T:
 
 class Uri(object):
 
-    def __init__(self, uri: Union[str, Path]):
-        self._orig_uri = uri
-        uri_norm, uri_type, validated = uri_normalize(uri=uri, return_parsed=True)
-        self._uri_norm: str = uri_norm
-        self._uri_type: UriType = uri_type
-        self._parsed: ParseResult = validated
+    def __init__(self, uri: Union[str, Path, ParseResult, 'Uri']):
+        # unwrap uri object
+        if isinstance(uri, Uri):
+            uri = uri._input_uri
+            assert not isinstance(uri, Uri)
+        # save the input
+        self._input_uri: Union[str, Path, ParseResult] = uri
+        # get validated uri
+        validated, validator = uri_validate(uri, return_validator=True)
+        self._validated: ParseResult = validated
+        self._validator: UriValidator = validator
 
     # ~=~=~ URI ~=~=~ #
 
     @property
-    def uri_norm(self) -> str:
-        return self._uri_norm
+    def uri_extract(self) -> str:
+        return self._validator.extract(self._validated)
 
     @property
-    def uri_type(self) -> UriType:
-        return self._uri_type
+    def uri_type(self) -> EnumUriType:
+        return self._validator.uri_type
 
     @property
     def uri_parsed(self) -> ParseResult:
-        return self._parsed
+        return self._validated
 
     @property
     def uri_basename(self) -> str:
-        return os.path.basename(self._parsed.path)
+        return os.path.basename(self._validated.path)
 
     @property
     def uri(self) -> str:
-        return self._parsed.geturl()
+        return self._validated.geturl()
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(uri={repr(self._orig_uri)})'
+        return f'{self.__class__.__name__}(uri={repr(self._input_uri)})'
 
     def __str__(self):
-        return self._orig_uri
+        return self.uri
 
     # ~=~=~ FILE ~=~=~ #
 
     @property
     def is_file(self) -> bool:
-        return self._uri_type == UriType.FILE
+        return self.uri_type == EnumUriType.FILE
 
     @property
-    @is_file_only
-    def file_is_abs(self) -> bool:
-        return os.path.isabs(self.uri_norm)
-
-    @property
-    @is_file_only
-    def file_is_rel(self) -> bool:
-        return not os.path.isabs(self.uri_norm)
-
-    @property
-    @is_file_only
+    @only_if(is_file)
     def file(self) -> str:
-        return self.uri_norm
+        return self.uri_extract
 
     @property
-    @is_file_only
+    @only_if(is_file)
     def file_abs(self) -> str:
-        return os.path.abspath(self.file)
+        return os.path.abspath(self.uri_extract)
 
     @property
-    @is_file_only
-    def path(self) -> Path:
-        return Path(self.uri_norm)
+    @only_if(is_file)
+    def file_is_abs(self) -> bool:
+        return os.path.isabs(self.uri_extract)
 
-    @property
-    @is_file_only
-    def path_abs(self) -> Path:
-        return Path(self.uri_norm).absolute()
-
-    # ~=~=~ URI ~=~=~ #
+    # ~=~=~ URL ~=~=~ #
 
     @property
     def is_url(self) -> bool:
-        return self._uri_type == UriType.URL
+        return self.uri_type == EnumUriType.URL
 
     @property
-    @is_url_only
-    def url_is_http(self) -> bool:
-        return self._parsed.scheme == 'http'
-
-    @property
-    @is_url_only
-    def url_is_https(self) -> bool:
-        return self._parsed.scheme == 'https'
-
-    @property
-    @is_url_only
+    @only_if(is_url)
     def url(self) -> str:
-        return self.uri_norm
+        return self.uri_extract
+
+    @property
+    @only_if(is_url)
+    def url_is_http(self) -> bool:
+        return self.uri_parsed.scheme == 'http'
+
+    @property
+    @only_if(is_url)
+    def url_is_https(self) -> bool:
+        return self.uri_parsed.scheme == 'https'
+
+    # ~=~=~ S3 ~=~=~ #
+
+    @property
+    def is_s3(self) -> bool:
+        return self.uri_type == EnumUriType.S3
+
+    # TODO ...
+
+    # ~=~=~ SSH ~=~=~ #
+
+    @property
+    def is_ssh(self) -> bool:
+        return self.uri_type == EnumUriType.SSH
+
+    # TODO ...
+
+    # ~=~=~ COMMON ~=~=~ #
+
+    # def download(self, dst: Union[str, Path, 'Uri']):
+    #     raise NotImplementedError
+    #
+    # def copy(self, dst: Union[str, Path, 'Uri']):
+    #     raise NotImplementedError
+    #
+    # def retrieve(self, dst: Union[str, Path, 'Uri']):
+    #     raise NotImplementedError
 
 
 # ========================================================================= #
@@ -367,17 +426,20 @@ class Uri(object):
 __all__ = (
     # errors
     'UriMalformedException',
-    'UriMalformedFileException',
-    'UriMalformedUrlException',
     'UriIsIncorrectTypeError',
-    'UriIsNotUrlError',
-    'UriIsNotFileError',
-    # functions
+    # enums
+    'EnumValMode',
+    'EnumUriType',
+    # validation
+    'UriFieldValidator',
+    'UriValidator',
+    'UriValidatorUrl',
+    'UriValidatorFile',
+    # functional
+    'uri_parse',
     'uri_validate',
-    'uri_is_valid',
-    'UriType',
-    'uri_normalize',
-    # class
+    'uri_extract',
+    # oop
     'Uri',
 )
 
