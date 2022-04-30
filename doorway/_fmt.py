@@ -23,34 +23,31 @@
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
 import math
+from typing import NoReturn
+from typing import Optional
+
+import doorway._colors as c
+from doorway._utils import VarHandlerBool
 
 
 # ========================================================================= #
-# Ansi Colors                                                               #
+# Variable Handlers                                                         #
 # ========================================================================= #
 
 
-RST = '\033[0m'
+_VAR_HANDLER_USE_COLORS = VarHandlerBool(
+    identifier='color_enabled',
+    environ_key='DOORWAY_COLOR_ENABLED',
+    fallback_value=True,
+)
 
-# dark colors
-GRY = '\033[90m'
-lRED = '\033[91m'
-lGRN = '\033[92m'
-lYLW = '\033[93m'
-lBLU = '\033[94m'
-lMGT = '\033[95m'
-lCYN = '\033[96m'
-WHT = '\033[97m'
 
-# light colors
-BLK = '\033[30m'
-RED = '\033[31m'
-GRN = '\033[32m'
-YLW = '\033[33m'
-BLU = '\033[34m'
-MGT = '\033[35m'
-CYN = '\033[36m'
-lGRY = '\033[37m'
+def color_enabled_set_default(color_enabled: Optional[bool]) -> NoReturn:
+    return _VAR_HANDLER_USE_COLORS.set_default_value(value=color_enabled)
+
+
+def color_enabled_get(color_enabled: Optional[bool] = None) -> bool:
+    return _VAR_HANDLER_USE_COLORS.get_value(override=color_enabled)
 
 
 # ========================================================================= #
@@ -58,27 +55,41 @@ lGRY = '\033[37m'
 # ========================================================================= #
 
 
-_BYTES_COLR = (WHT, lGRN, lYLW, lRED, lRED, lRED, lRED, lRED, lRED)
-_BYTES_NAME = {
+_BYTES_COLOR = (c.WHT, c.lGRN, c.lYLW, c.lRED, c.lRED, c.lRED, c.lRED, c.lRED, c.lRED)
+_BYTES_NAMES = {
     1024: ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"),
     1000: ("B", "KB",  "MB",  "GB",  "TB",  "PB",  "EB",  "ZB",  "YB"),
 }
 
 
-def bytes_to_human(size_bytes: int, decimals: int = 3, color: bool = True, mul: int = 1024) -> str:
+def fmt_bytes_to_human(size_bytes: int, decimals: int = 3, color_enabled: Optional[bool] = None, mul: int = 1024) -> str:
     if size_bytes == 0:
         return "0B"
-    if mul not in _BYTES_NAME:
-        raise ValueError(f'invalid bytes multiplier: {repr(mul)} must be one of: {list(_BYTES_NAME.keys())}')
+    if mul not in _BYTES_NAMES:
+        raise ValueError(f'invalid bytes multiplier: {repr(mul)} must be one of: {list(_BYTES_NAMES.keys())}')
     # round correctly
     i = int(math.floor(math.log(size_bytes, mul)))
     s = round(size_bytes / math.pow(mul, i), decimals)
+    # using colors
+
     # generate string
-    name = f'{_BYTES_COLR[i]}{_BYTES_NAME[mul][i]}{RST}' if color else f'{_BYTES_NAME[mul][i]}'
+    name = f'{_BYTES_COLOR[i]}{_BYTES_NAMES[mul][i]}{c.RST}' if color_enabled else f'{_BYTES_NAMES[mul][i]}'
     # format string
     return f"{s:{4+decimals}.{decimals}f} {name}"
 
 
 # ========================================================================= #
-# Byte Formatting                                                           #
+# export                                                                    #
+# ========================================================================= #
+
+
+__all__ = (
+    'color_enabled_set_default',
+    'color_enabled_get',
+    'fmt_bytes_to_human',
+)
+
+
+# ========================================================================= #
+# END                                                                       #
 # ========================================================================= #

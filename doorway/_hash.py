@@ -29,7 +29,7 @@ from typing import Dict
 from typing import NoReturn
 from typing import Optional
 from typing import Union
-from doorway._utils import VarHandler
+from doorway._utils import VarHandlerStr
 
 
 # ========================================================================= #
@@ -87,7 +87,7 @@ _FILE_BYTE_PRODUCERS = {
 }
 
 
-_VAR_HANDLER_HASH_MODE = VarHandler(
+_VAR_HANDLER_HASH_MODE = VarHandlerStr(
     identifier='hash_mode',
     environ_key='DOORWAY_HASH_MODE',
     fallback_value='fast',
@@ -100,17 +100,10 @@ def hash_mode_set_default(hash_mode: Optional[HashMode]) -> NoReturn:
 
 
 def hash_mode_get(hash_mode: Optional[HashMode] = None) -> HashMode:
-    """
-    priority:
-      1. manual specification
-      2. default mode (hash_mode_set_default)
-      3. environment variable
-      4. fallback mode ("fast")
-    """
     return _VAR_HANDLER_HASH_MODE.get_value(override=hash_mode)
 
 
-_VAR_HANDLER_HASH_ALGO = VarHandler(
+_VAR_HANDLER_HASH_ALGO = VarHandlerStr(
     identifier='hash_algo',
     environ_key='DOORWAY_HASH_ALGO',
     fallback_value='md5',
@@ -123,13 +116,6 @@ def hash_algo_set_default(hash_algo: Optional[HashAlgo]) -> NoReturn:
 
 
 def hash_algo_get(hash_algo: Optional[HashAlgo] = None) -> HashAlgo:
-    """
-    priority:
-      1. manual specification
-      2. default mode (hash_algo_set_default)
-      3. environment variable
-      4. fallback mode ("md5")
-    """
     return _VAR_HANDLER_HASH_ALGO.get_value(override=hash_algo)
 
 
