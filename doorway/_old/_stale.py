@@ -31,8 +31,8 @@ from typing import Optional
 from typing import Union
 
 from doorway._hash import hash_file
-from doorway._hash import normalise_hash
-from doorway._hash import validate_file_hash
+from doorway._hash import hash_norm
+from doorway._hash import hash_file_validate
 
 
 LOG = logging.getLogger(__name__)
@@ -53,12 +53,12 @@ class Stalefile(object):
         self,
         file: str,
         hash: Optional[Union[str, Dict[str, str]]],
-        hash_type: str = 'md5',
+        hash_algo: str = 'md5',
         hash_mode: str = 'fast',
     ):
         self.file = file
-        self.hash = normalise_hash(hash=hash, hash_mode=hash_mode)
-        self.hash_type = hash_type
+        self.hash = hash_norm(hash=hash, hash_mode=hash_mode)
+        self.hash_algo = hash_algo
         self.hash_mode = hash_mode
 
     def __call__(self, func: Callable[[str], NoReturn]) -> Callable[[], str]:
@@ -67,19 +67,19 @@ class Stalefile(object):
             if self.is_stale():
                 LOG.debug(f'calling wrapped function: {func} because the file is stale: {repr(self.file)}')
                 func(self.file)
-                validate_file_hash(self.file, hash=self.hash, hash_type=self.hash_type, hash_mode=self.hash_mode, missing_ok=True)
+                hash_file_validate(self.file, hash=self.hash, hash_algo=self.hash_algo, hash_mode=self.hash_mode, hash_missing=True)
             else:
                 LOG.debug(f'skipped wrapped function: {func} because the file is fresh: {repr(self.file)}')
             return self.file
         return wrapper
 
     def is_stale(self):
-        fhash = hash_file(file=self.file, hash_type=self.hash_type, hash_mode=self.hash_mode, missing_ok=True)
+        fhash = hash_file(file=self.file, hash_algo=self.hash_algo, hash_mode=self.hash_mode, hash_missing=True)
         if not fhash:
             LOG.info(f'file is stale because it does not exist: {repr(self.file)}')
             return True
         if fhash != self.hash:
-            LOG.warning(f'file is stale because the computed {self.hash_mode} {self.hash_type} hash: {fhash} does not match the target hash: {self.hash} for file: {repr(self.file)}')
+            LOG.warning(f'file is stale because the computed {self.hash_mode} {self.hash_algo} hash: {fhash} does not match the target hash: {self.hash} for file: {repr(self.file)}')
             return True
         LOG.debug(f'file is fresh: {repr(self.file)}')
         return False
@@ -91,14 +91,14 @@ class Stalefile(object):
 def stalefile(
     file: str,
     hash: Optional[Union[str, Dict[str, str]]],
-    hash_type: str = 'md5',
+    hash_algo: str = 'md5',
     hash_mode: str = 'fast',
     fn: Optional[callable] = None,
 ):
     decorator = Stalefile(
         file=file,
         hash=hash,
-        hash_type=hash_type,
+        hash_algo=hash_algo,
         hash_mode=hash_mode,
     )
     # wrap directly if function is specified
