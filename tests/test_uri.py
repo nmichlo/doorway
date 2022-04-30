@@ -36,8 +36,8 @@ from doorway._dev import uri_validate
 
 
 def test_uri_type_enum():
-    assert len(EnumUriType) == 2
-    assert list(EnumUriType) == [EnumUriType.FILE, EnumUriType.URL]
+    assert len(EnumUriType) == 4
+    assert list(EnumUriType) == [EnumUriType.FILE, EnumUriType.URL, EnumUriType.S3, EnumUriType.SSH]
     # test types
     assert isinstance(EnumUriType.FILE, EnumUriType)
     assert isinstance(EnumUriType.FILE.value, str)

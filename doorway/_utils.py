@@ -58,10 +58,10 @@ class VarHandlerBase(Generic[T]):
 
     # OVERRIDEABLE
 
-    def _validate_value(self, value: T, source: str) -> NoReturn:
+    def _validate_value(self, value: T, source: str) -> NoReturn:  # pragma: no cover
         raise NotImplementedError
 
-    def _normalize_environ_value(self, value: str) -> T:
+    def _normalize_environ_value(self, value: str) -> T:  # pragma: no cover
         raise NotImplementedError
 
     # COMMON - PROPS
@@ -151,7 +151,7 @@ class VarHandlerStr(VarHandlerBase[str]):
         if not isinstance(value, str):
             raise TypeError(f'invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {str}, got type: {type(value)}')
         if value not in self._allowed_values:
-            raise ValueError(f'invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be one of the allowed_values: {self.allowed_values}')
+            raise KeyError(f'invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be one of the allowed_values: {self.allowed_values}')
 
     def _normalize_environ_value(self, value: str) -> str:
         return value

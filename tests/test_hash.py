@@ -128,7 +128,7 @@ def test_hash_mode_set_default():
         assert hash_mode_get() == 'full'
     assert hash_mode_get() == 'fast'
     # check invalid
-    with pytest.raises(KeyError, match="invalid hash_mode: 'INVALID', must be one of: \['fast', 'full'\]"):
+    with pytest.raises(KeyError, match="invalid hash_mode: \'INVALID\', obtained from source: set_default_value, must be one of the allowed_values: \['fast', 'full'\]"):
         hash_mode_set_default('INVALID')
 
 
@@ -145,7 +145,7 @@ def test_hash_algo_set_default():
         assert hash_algo_get() == 'sha1'
     assert hash_algo_get() == 'md5'
     # check invalid
-    with pytest.raises(KeyError, match="invalid hash_algo: 'INVALID', must be one of:"):
+    with pytest.raises(KeyError, match="invalid hash_algo: 'INVALID', obtained from source: set_default_value, must be one of the allowed_values:"):
         hash_algo_set_default('INVALID')
 
 
