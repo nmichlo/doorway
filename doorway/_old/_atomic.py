@@ -30,8 +30,8 @@ from typing import Optional
 from typing import Union
 from uuid import uuid4
 
-from doorway._utils_uri import parse_uri_and_type
-from doorway._utils_uri import modify_file_name
+from doorway._uri import parse_uri_and_type
+from doorway._uri import modify_file_name
 
 
 log = logging.getLogger(__name__)

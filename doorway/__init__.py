@@ -26,4 +26,4 @@
 from doorway._hash import *
 # from doorway._names import *
 # from doorway._stale import *
-from doorway._utils_uri import *
+from doorway._uri import *
