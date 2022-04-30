@@ -69,8 +69,31 @@ def temp_sys_args(new_argv):
 
 
 @contextmanager
-def temp_environ(environment: Dict[str, Any]):
-    # TODO: should this copy values? -- could use unittest.mock.patch.dict(...)
+def temp_attr(obj, name, value):
+    # if we should delete this or just reset it
+    keep_val = hasattr(obj, name)
+    prev_val = getattr(obj, name, None)
+    # overwrite the value
+    setattr(obj, name, value)
+    # yield the context
+    try:
+        yield obj
+    finally:
+        # restore the original attr
+        if keep_val:
+            setattr(obj, name, prev_val)
+        else:
+            delattr(obj, name)
+
+
+@contextmanager
+def temp_environ(environment: Dict[str, Any] = None, **kwargs):
+    # combine the kwargs and the environment dict
+    if environment is None:
+        environment = {}
+    if kwargs:
+        assert environment.keys().isdisjoint(kwargs.keys())
+        environment.update(kwargs)
     # save the old environment
     existing_env = {}
     for k in environment:
