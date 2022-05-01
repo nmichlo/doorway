@@ -25,11 +25,14 @@
 import logging
 from functools import wraps
 from typing import Callable
-from typing import Dict
 from typing import NoReturn
 from typing import Optional
 from typing import Union
 
+from doorway._hash import HashPath
+from doorway._hash import Hashes
+from doorway._hash import HashAlgo
+from doorway._hash import HashMode
 from doorway._hash import hash_file
 from doorway._hash import hash_norm
 from doorway._hash import hash_file_validate
@@ -39,8 +42,90 @@ LOG = logging.getLogger(__name__)
 
 
 # ========================================================================= #
-# Function Caching                                                          #
+# Functional Stalefile                                                      #
 # ========================================================================= #
+
+
+def stalefile_is_stale(
+    path: HashPath,
+    hash: Hashes,
+    hash_mode: Optional[HashMode] = None,
+    hash_algo: Optional[HashAlgo] = None,
+):
+    # compute the hash for a file
+    fhash = hash_file(path=path, hash_mode=hash_mode, hash_algo=hash_algo, hash_missing=True)
+    # check if the file is stale or not
+    if not fhash:
+        LOG.info(f'file is stale because it does not exist: {repr(path)}')
+        return True
+    # obtain the target hash
+    hash = hash_norm(hash=hash, hash_mode=hash_mode, hash_algo=hash_algo)
+    # check if the file is stale or not
+    if fhash != hash:
+        LOG.warning(f'file is stale because the computed {hash_mode}:{hash_algo} hash: {fhash} does not match the target hash: {hash} for file: {repr(path)}')
+        return True
+    # the file is fresh
+    LOG.debug(f'file is fresh: {repr(path)}')
+    return False
+
+
+def stalefile_generate(
+    make_file_fn: Callable[[HashPath], NoReturn],
+    path: HashPath,
+    hash: Hashes,
+    hash_mode: Optional[HashMode] = None,
+    hash_algo: Optional[HashAlgo] = None,
+) -> HashPath:
+    is_stale = stalefile_is_stale(path=path, hash=hash, hash_mode=hash_mode, hash_algo=hash_algo)
+    # if the file is stale:
+    # - 1. produce is using the wrapped function
+    # - 2. validate the produced file and throw errors if it is wrong!
+    if is_stale:
+        LOG.debug(f'calling wrapped function: {make_file_fn} because the file is stale: {repr(path)}')
+        make_file_fn(path)
+        hash_file_validate(path, hash=hash, hash_mode=hash_mode, hash_algo=hash_algo, hash_missing=True)
+    # if the file is fresh
+    # - 1. don't actually do anything, skip calling the producer!
+    else:
+        LOG.debug(f'skipped wrapped function: {make_file_fn} because the file is fresh: {repr(path)}')
+    # return the path that contains the valid file!
+    return path
+
+
+def stalefile_decorator(
+    path: str,
+    hash: Hashes,
+    hash_mode: Optional[HashMode] = None,
+    hash_algo: Optional[HashAlgo] = None,
+    make_file_fn: Optional[Callable[[HashPath], NoReturn]] = None,
+) -> Union[
+        Callable[[Callable[[HashPath], NoReturn]], Callable[[], HashPath]],
+        Callable[[], HashPath],
+]:
+    # the wrapped function should take in a path and produce a file at that location.
+    # a. if the file already exists, this function is not called!
+    # b. if the file does not exist, the function is called to generate the file, which is then validated!
+    def decorator(make_file_fn: Callable[[HashPath], NoReturn]) -> Callable[[], HashPath]:
+        @wraps(make_file_fn)
+        def make_file_if_stale() -> HashPath:
+            return stalefile_generate(
+                make_file_fn=make_file_fn,
+                path=path,
+                hash=hash,
+                hash_mode=hash_mode,
+                hash_algo=hash_algo,
+            )
+        return make_file_if_stale
+    # wrap directly if function is specified
+    if make_file_fn is not None:
+        return decorator(make_file_fn)
+    return decorator
+
+
+# ========================================================================= #
+# Stalefile Class                                                           #
+# ========================================================================= #
+
 
 
 class Stalefile(object):
@@ -51,60 +136,47 @@ class Stalefile(object):
 
     def __init__(
         self,
-        file: str,
-        hash: Optional[Union[str, Dict[str, str]]],
-        hash_algo: str = 'md5',
-        hash_mode: str = 'fast',
+        path: str,
+        hash: Hashes,
+        hash_mode: Optional[HashMode] = None,
+        hash_algo: Optional[HashAlgo] = None,
     ):
-        self.file = file
-        self.hash = hash_norm(hash=hash, hash_mode=hash_mode)
-        self.hash_algo = hash_algo
-        self.hash_mode = hash_mode
+        self._path = path
+        self._hash = hash
+        self._hash_mode = hash_mode
+        self._hash_algo = hash_algo
 
-    def __call__(self, func: Callable[[str], NoReturn]) -> Callable[[], str]:
-        @wraps(func)
-        def wrapper() -> str:
-            if self.is_stale():
-                LOG.debug(f'calling wrapped function: {func} because the file is stale: {repr(self.file)}')
-                func(self.file)
-                hash_file_validate(self.file, hash=self.hash, hash_algo=self.hash_algo, hash_mode=self.hash_mode, hash_missing=True)
-            else:
-                LOG.debug(f'skipped wrapped function: {func} because the file is fresh: {repr(self.file)}')
-            return self.file
-        return wrapper
+    def generate(self, make_file_fn: Callable[[HashPath], NoReturn]) -> HashPath:
+        return stalefile_generate(
+            make_file_fn=make_file_fn,
+            path=self._path,
+            hash=self._hash,
+            hash_mode=self._hash_mode,
+            hash_algo=self._hash_algo,
+        )
+
+    def decorator(self, make_file_fn: Optional[Callable[[HashPath], NoReturn]] = None) -> Callable[[], HashPath]:
+        # the wrapped function should take in a path and produce a file at that location.
+        # a. if the file already exists, this function is not called!
+        # b. if the file does not exist, the function is called to generate the file, which is then validated!
+        return stalefile_decorator(
+            path=self._path,
+            hash=self._hash,
+            hash_mode=self._hash_mode,
+            hash_algo=self._hash_algo,
+            make_file_fn=make_file_fn,
+        )
 
     def is_stale(self):
-        fhash = hash_file(file=self.file, hash_algo=self.hash_algo, hash_mode=self.hash_mode, hash_missing=True)
-        if not fhash:
-            LOG.info(f'file is stale because it does not exist: {repr(self.file)}')
-            return True
-        if fhash != self.hash:
-            LOG.warning(f'file is stale because the computed {self.hash_mode} {self.hash_algo} hash: {fhash} does not match the target hash: {self.hash} for file: {repr(self.file)}')
-            return True
-        LOG.debug(f'file is fresh: {repr(self.file)}')
-        return False
+        return stalefile_is_stale(
+            path=self._path,
+            hash=self._hash,
+            hash_mode=self._hash_mode,
+            hash_algo=self._hash_algo,
+        )
 
     def __bool__(self):
         return self.is_stale()
-
-
-def stalefile(
-    file: str,
-    hash: Optional[Union[str, Dict[str, str]]],
-    hash_algo: str = 'md5',
-    hash_mode: str = 'fast',
-    fn: Optional[callable] = None,
-):
-    decorator = Stalefile(
-        file=file,
-        hash=hash,
-        hash_algo=hash_algo,
-        hash_mode=hash_mode,
-    )
-    # wrap directly if function is specified
-    if fn is not None:
-        return decorator(fn)
-    return decorator
 
 
 # ========================================================================= #
@@ -112,10 +184,12 @@ def stalefile(
 # ========================================================================= #
 
 
-# __all__ = (
-#     'Stalefile',
-#     'stalefile',
-# )
+__all__ = (
+    'stalefile_is_stale',
+    'stalefile_generate',
+    'stalefile_decorator',
+    'Stalefile',
+)
 
 
 # ========================================================================= #

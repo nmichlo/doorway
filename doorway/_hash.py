@@ -24,6 +24,7 @@
 
 import hashlib
 import os
+import warnings
 from pathlib import Path
 from typing import Dict
 from typing import NoReturn
@@ -188,8 +189,10 @@ def hash_norm(hash: Hashes, hash_mode: Optional[HashMode] = None, hash_algo: Opt
         if multi_key in hash:
             hash = hash[multi_key]
         elif hash_mode in hash:
+            warnings.warn('obtaining the hash directly from the `hash_mode` is deprecated, please use the full key `hash_mode:hash_algo`')
             hash = hash[hash_mode]
         elif hash_algo in hash:
+            warnings.warn('obtaining the hash directly from the `hash_algo` is deprecated, please use the full key `hash_mode:hash_algo`')
             hash = hash[hash_algo]
         else:
             raise KeyError(f'hash dictionary does not contain a valid key for either 1. {repr(multi_key)}, 2. {repr(hash_mode)}, or 3. {repr(hash_algo)}. Available hash keys are: {sorted(hash.keys())}')
