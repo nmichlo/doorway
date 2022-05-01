@@ -22,12 +22,9 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
-# from doorway._io import *
-from doorway._hash import *
 from doorway._fmt import *
-# from doorway._names import *
-# from doorway._stale import *
-# from doorway._uri import *
+from doorway._hash import *
+from doorway._stale import *
 
 # colors
 import doorway._colors as c
