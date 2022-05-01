@@ -55,27 +55,36 @@ def color_enabled_get(color_enabled: Optional[bool] = None) -> bool:
 # ========================================================================= #
 
 
-_BYTES_COLOR = (c.WHT, c.lGRN, c.lYLW, c.lRED, c.lRED, c.lRED, c.lRED, c.lRED, c.lRED)
-_BYTES_NAMES = {
+# the names and colours of the different units
+_BYTES_UNIT_COLORS = (c.WHT, c.lGRN, c.lYLW, c.lRED, c.lRED, c.lRED, c.lRED, c.lRED, c.lRED)
+_BYTES_UNIT_NAMES = {
     1024: ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"),
     1000: ("B", "KB",  "MB",  "GB",  "TB",  "PB",  "EB",  "ZB",  "YB"),
 }
 
+# amount of extra padding to add to the left of the dot
+_BYTES_BASE_PADDING = {
+    1024: 5,
+    1000: 4,
+}
 
-def fmt_bytes_to_human(size_bytes: int, decimals: int = 3, color_enabled: Optional[bool] = None, mul: int = 1024) -> str:
-    if size_bytes == 0:
-        return "0B"
-    if mul not in _BYTES_NAMES:
-        raise ValueError(f'invalid bytes multiplier: {repr(mul)} must be one of: {list(_BYTES_NAMES.keys())}')
-    # round correctly
-    i = int(math.floor(math.log(size_bytes, mul)))
-    s = round(size_bytes / math.pow(mul, i), decimals)
-    # using colors
 
-    # generate string
-    name = f'{_BYTES_COLOR[i]}{_BYTES_NAMES[mul][i]}{c.RST}' if color_enabled else f'{_BYTES_NAMES[mul][i]}'
+def fmt_bytes_to_human(size_bytes: int, decimals: int = 3, color_enabled: Optional[bool] = None, base: int = 1000, old=True) -> str:
+    # TODO: this does not yet handle values greater than YB or YiB
+    # check the unit of measurement
+    if base not in _BYTES_UNIT_NAMES:
+        raise ValueError(f'invalid bytes base number: {repr(base)} must be one of: {sorted(_BYTES_UNIT_NAMES.keys())}')
+    # compute the power
+    power = math.log(size_bytes, base) if (size_bytes != 0) else 0
+    i = int(power)
+    size_div = size_bytes / (base**i)
+    # get the unit of measurement
+    unit = _BYTES_UNIT_NAMES[base][i]
+    if color_enabled:
+        unit = f'{_BYTES_UNIT_COLORS[i]}{unit}{c.RST}'
     # format string
-    return f"{s:{4+decimals}.{decimals}f} {name}"
+    lpad = _BYTES_BASE_PADDING[base]
+    return f"{size_div:>{lpad+decimals}.{decimals}f} {unit}"
 
 
 # ========================================================================= #
