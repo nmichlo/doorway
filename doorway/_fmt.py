@@ -36,18 +36,18 @@ from doorway._utils import VarHandlerBool
 
 
 _VAR_HANDLER_USE_COLORS = VarHandlerBool(
-    identifier='color_enabled',
-    environ_key='DOORWAY_COLOR_ENABLED',
+    identifier='colors',
+    environ_key='DOORWAY_ENABLE_COLORS',
     fallback_value=True,
 )
 
 
-def color_enabled_set_default(color_enabled: Optional[bool]) -> NoReturn:
-    return _VAR_HANDLER_USE_COLORS.set_default_value(value=color_enabled)
+def fmt_use_colors_set_default(use_colors: Optional[bool]) -> NoReturn:
+    return _VAR_HANDLER_USE_COLORS.set_default_value(value=use_colors)
 
 
-def color_enabled_get(color_enabled: Optional[bool] = None) -> bool:
-    return _VAR_HANDLER_USE_COLORS.get_value(override=color_enabled)
+def fmt_use_colors_get(use_colors: Optional[bool] = None) -> bool:
+    return _VAR_HANDLER_USE_COLORS.get_value(override=use_colors)
 
 
 # ========================================================================= #
@@ -68,8 +68,19 @@ _BYTES_BASE_PADDING = {
     1000: 4,
 }
 
+_BYTES_UNIT_PADDING = {
+    1024: 3,
+    1000: 2,
+}
 
-def fmt_bytes_to_human(size_bytes: int, decimals: int = 3, color_enabled: Optional[bool] = None, base: int = 1000, old=True) -> str:
+
+def fmt_bytes_to_human(
+    size_bytes: int,
+    base: int = 1024,
+    decimals: int = 3,
+    align: bool = False,
+    use_colors: Optional[bool] = None,
+) -> str:
     # TODO: this does not yet handle values greater than YB or YiB
     # check the unit of measurement
     if base not in _BYTES_UNIT_NAMES:
@@ -80,12 +91,15 @@ def fmt_bytes_to_human(size_bytes: int, decimals: int = 3, color_enabled: Option
     size_div = size_bytes / (base**i)
     # get the unit of measurement
     unit = _BYTES_UNIT_NAMES[base][i]
-    if color_enabled:
+    if fmt_use_colors_get(use_colors):
         unit = f'{_BYTES_UNIT_COLORS[i]}{unit}{c.RST}'
     # format string
-    lpad = _BYTES_BASE_PADDING[base]
-    return f"{size_div:>{lpad+decimals}.{decimals}f} {unit}"
-
+    if align:
+        lpad = _BYTES_BASE_PADDING[base]
+        rpad = _BYTES_UNIT_PADDING[base]
+        return f"{size_div:>{lpad+decimals}.{decimals}f} {unit:<{rpad}s}"
+    else:
+        return f"{size_div:.{decimals}f} {unit}"
 
 # ========================================================================= #
 # export                                                                    #
@@ -93,8 +107,8 @@ def fmt_bytes_to_human(size_bytes: int, decimals: int = 3, color_enabled: Option
 
 
 __all__ = (
-    'color_enabled_set_default',
-    'color_enabled_get',
+    'fmt_use_colors_set_default',
+    'fmt_use_colors_get',
     'fmt_bytes_to_human',
 )
 
