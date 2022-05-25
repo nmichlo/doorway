@@ -24,6 +24,7 @@
 
 from doorway._fmt import *
 from doorway._hash import *
+from doorway._shard import *
 from doorway._stale import *
 
 # colors

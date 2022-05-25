@@ -27,6 +27,7 @@ import os
 import warnings
 from pathlib import Path
 from typing import Dict
+from typing import Iterable
 from typing import NoReturn
 from typing import Optional
 from typing import Union
@@ -125,7 +126,34 @@ def hash_algo_get(hash_algo: Optional[HashAlgo] = None) -> HashAlgo:
 # ========================================================================= #
 
 
-def hash_file(path: HashPath, hash_mode: Optional[HashMode] = None, hash_algo: Optional[HashAlgo] = None, hash_missing: bool = False) -> Hash:
+def hash_bytes(bytes_str: bytes, hash_algo: Optional[HashAlgo] = None) -> str:
+    # normalise the hash_algo
+    hash_algo = hash_algo_get(hash_algo=hash_algo)
+    # generate hash and convert to a string
+    return hashlib.new(hash_algo, data=bytes_str).hexdigest()
+
+
+def hash_bytes_iter(bytes_iter: Iterable[bytes], hash_algo: Optional[HashAlgo] = None) -> str:
+    # normalise the hash_algo
+    hash_algo = hash_algo_get(hash_algo=hash_algo)
+    # generate hash and convert to a string
+    hash = hashlib.new(hash_algo)
+    for bytes in bytes_iter:
+        hash.update(bytes)
+    return hash.hexdigest()
+
+
+def hash_str(str: str, hash_algo: Optional[HashAlgo] = None, encoding: str = 'utf-8') -> str:
+    # encode string as bytes and then hash
+    return hash_bytes(str.encode(encoding), hash_algo=hash_algo)
+
+
+def hash_file(
+    path: HashPath,
+    hash_mode: Optional[HashMode] = None,
+    hash_algo: Optional[HashAlgo] = None,
+    hash_missing: bool = False,
+) -> Hash:
     """
     :param path: the path to the file
     :param hash_mode: "full" uses all the bytes in the file to compute the hash, "fast" uses the start, middle, end bytes as well as the size of the file in the hash. Default is "fast".
@@ -136,7 +164,6 @@ def hash_file(path: HashPath, hash_mode: Optional[HashMode] = None, hash_algo: O
     """
     # normalise the hash_mode
     hash_mode = hash_mode_get(hash_mode=hash_mode)
-    hash_algo = hash_algo_get(hash_algo=hash_algo)
     # check the file exists
     path = str(path)
     if os.path.exists(path):
@@ -148,15 +175,9 @@ def hash_file(path: HashPath, hash_mode: Optional[HashMode] = None, hash_algo: O
         raise FileNotFoundError(f'could not compute hash for missing file: {repr(path)}')
     # get file bytes iterator
     byte_producer = _FILE_BYTE_PRODUCERS[hash_mode]
-    byte_iter = byte_producer(path)
-    # generate hash
-    import hashlib
-    hash = hashlib.new(hash_algo)
-    for i, bytes in enumerate(byte_iter):
-        hash.update(bytes)
-    hash = hash.hexdigest()
-    # done
-    return hash
+    bytes_iter = byte_producer(path)
+    # get file bytes iterator
+    return hash_bytes_iter(bytes_iter, hash_algo=hash_algo)
 
 
 # ========================================================================= #
@@ -170,7 +191,11 @@ class HashError(Exception):
     """
 
 
-def hash_norm(hash: Hashes, hash_mode: Optional[HashMode] = None, hash_algo: Optional[HashAlgo] = None) -> Hash:
+def hash_norm(
+    hash: Hashes,
+    hash_mode: Optional[HashMode] = None,
+    hash_algo: Optional[HashAlgo] = None,
+) -> Hash:
     """
     file hashes depend on the mode.
     - Allow hashes to be dictionaries that map the hash_mode or hash_algo to the hash.
@@ -203,7 +228,13 @@ def hash_norm(hash: Hashes, hash_mode: Optional[HashMode] = None, hash_algo: Opt
     return hash
 
 
-def hash_file_validate(path: HashPath, hash: Hashes, hash_mode: Optional[HashMode] = None, hash_algo: Optional[HashAlgo] = None, hash_missing: bool = False) -> NoReturn:
+def hash_file_validate(
+    path: HashPath,
+    hash: Hashes,
+    hash_mode: Optional[HashMode] = None,
+    hash_algo: Optional[HashAlgo] = None,
+    hash_missing: bool = False,
+) -> NoReturn:
     """
     :raises FileNotFoundError, HashError
     """
@@ -220,7 +251,13 @@ def hash_file_validate(path: HashPath, hash: Hashes, hash_mode: Optional[HashMod
         raise HashError(f'computed {hash_mode} {hash_algo} hash: {repr(fhash)} does not match expected hash: {repr(hash)} for file: {repr(path)}')
 
 
-def hash_file_is_valid(path: HashPath, hash: Hashes, hash_mode: Optional[HashMode] = None, hash_algo: Optional[HashAlgo] = None, hash_missing: bool = False) -> bool:
+def hash_file_is_valid(
+    path: HashPath,
+    hash: Hashes,
+    hash_mode: Optional[HashMode] = None,
+    hash_algo: Optional[HashAlgo] = None,
+    hash_missing: bool = False,
+) -> bool:
     try:
         hash_file_validate(path=path, hash=hash, hash_algo=hash_algo, hash_mode=hash_mode, hash_missing=hash_missing)
     except HashError:
@@ -250,6 +287,9 @@ __all__ = (
     # normalise hash
     'hash_norm',
     # compute hash
+    'hash_bytes',
+    'hash_bytes_iter',
+    'hash_str',
     'hash_file',
     'hash_file_validate',
     'hash_file_is_valid',
