@@ -1,3 +1,4 @@
+
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 #  MIT License
 #
@@ -22,57 +23,50 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
-import contextlib
 import os
 import sys
-from contextlib import contextmanager
+import contextlib
 from typing import Any
 from typing import Dict
 
 
 # ========================================================================= #
-# TEST UTILS                                                                #
+# context managers -- io streams                                            #
 # ========================================================================= #
 
 
-@contextmanager
-def no_stdout():
+@contextlib.contextmanager
+def ctx_no_stdout():
     old_stdout = sys.stdout
     sys.stdout = open(os.devnull, 'w')
-    yield
-    sys.stdout = old_stdout
+    try:
+        yield
+    finally:
+        sys.stdout = old_stdout
 
 
-@contextmanager
-def no_stderr():
+@contextlib.contextmanager
+def ctx_no_stderr():
     old_stderr = sys.stderr
     sys.stderr = open(os.devnull, 'w')
-    yield
-    sys.stderr = old_stderr
+    try:
+        yield
+    finally:
+        sys.stderr = old_stderr
+
+
+# ========================================================================= #
+# context managers -- attr                                                  #
+# ========================================================================= #
+
+
+_DELETE = object()
 
 
 @contextlib.contextmanager
-def temp_wd(new_wd):
-    old_wd = os.getcwd()
-    os.chdir(new_wd)
-    yield
-    os.chdir(old_wd)
-
-
-@contextlib.contextmanager
-def temp_sys_args(new_argv):
-    # TODO: should this copy values?
-    old_argv = sys.argv
-    sys.argv = new_argv
-    yield
-    sys.argv = old_argv
-
-
-@contextmanager
-def temp_attr(obj, name, value):
+def ctx_temp_attr(obj, name, value):
     # if we should delete this or just reset it
-    keep_val = hasattr(obj, name)
-    prev_val = getattr(obj, name, None)
+    prev_val = getattr(obj, name, _DELETE)
     # overwrite the value
     setattr(obj, name, value)
     # yield the context
@@ -80,25 +74,50 @@ def temp_attr(obj, name, value):
         yield obj
     finally:
         # restore the original attr
-        if keep_val:
-            setattr(obj, name, prev_val)
-        else:
+        if prev_val is _DELETE:
             delattr(obj, name)
+        else:
+            setattr(obj, name, prev_val)
 
 
-@contextmanager
-def temp_environ(environment: Dict[str, Any] = None, **kwargs):
+# ========================================================================= #
+# context managers -- working dir, args, env                                #
+# ========================================================================= #
+
+
+@contextlib.contextmanager
+def ctx_temp_wd(new_wd):
+    old_wd = os.getcwd()
+    os.chdir(new_wd)
+    try:
+        yield
+    finally:
+        os.chdir(old_wd)
+
+
+@contextlib.contextmanager
+def ctx_temp_sys_args(new_argv):
+    old_argv = sys.argv
+    sys.argv = new_argv
+    try:
+        yield
+    finally:
+        sys.argv = old_argv
+
+
+@contextlib.contextmanager
+def ctx_temp_environ(environment: Dict[str, Any] = None, **env_kwargs):
     # combine the kwargs and the environment dict
     if environment is None:
         environment = {}
-    if kwargs:
-        assert environment.keys().isdisjoint(kwargs.keys())
-        environment.update(kwargs)
+    if env_kwargs:
+        assert environment.keys().isdisjoint(env_kwargs.keys())
+        environment.update(env_kwargs)
     # save the old environment
-    existing_env = {}
+    old_env = {}
     for k in environment:
         if k in os.environ:
-            existing_env[k] = os.environ[k]
+            old_env[k] = os.environ[k]
     # update the environment
     os.environ.update(environment)
     # run the context
@@ -107,8 +126,8 @@ def temp_environ(environment: Dict[str, Any] = None, **kwargs):
     finally:
         # restore the original environment
         for k in environment:
-            if k in existing_env:
-                os.environ[k] = existing_env[k]
+            if k in old_env:
+                os.environ[k] = old_env[k]
             else:
                 del os.environ[k]
 

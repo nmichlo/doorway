@@ -22,12 +22,8 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
-import pytest
-
-from doorway._fmt import fmt_use_colors_set_default
-from doorway._fmt import fmt_use_colors_get
 from doorway._fmt import fmt_bytes_to_human
-from tests.util import temp_environ
+from doorway._ctx import ctx_temp_environ
 
 
 # ========================================================================= #
@@ -36,7 +32,7 @@ from tests.util import temp_environ
 
 
 def test_fmt_bytes_to_human():
-    with temp_environ(DOORWAY_ENABLE_COLORS='false'):
+    with ctx_temp_environ(DOORWAY_ENABLE_COLORS='false'):
         assert fmt_bytes_to_human(1000**1, base=1024, align=True) == '1000.000 B  '
         assert fmt_bytes_to_human(1000**2, base=1024, align=True) == ' 976.562 KiB'
         assert fmt_bytes_to_human(1000**3, base=1024, align=True) == ' 953.674 MiB'
