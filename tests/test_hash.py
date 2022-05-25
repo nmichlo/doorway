@@ -38,8 +38,8 @@ from doorway._hash import hash_mode_set_default
 from doorway._hash import hash_algo_get
 from doorway._hash import hash_algo_set_default
 from doorway._utils import VarHandlerStr
-from tests.util import temp_attr
-from tests.util import temp_environ
+from doorway._ctx import ctx_temp_attr
+from doorway._ctx import ctx_temp_environ
 
 
 # ========================================================================= #
@@ -49,22 +49,22 @@ from tests.util import temp_environ
 
 @contextmanager
 def context_temp_hash_mode_fallback(hash_mode: Optional[str]):
-    with nullcontext() if (not hash_mode) else temp_attr(doorway._hash._VAR_HANDLER_HASH_MODE, '_value_fallback', hash_mode):
+    with nullcontext() if (not hash_mode) else ctx_temp_attr(doorway._hash._VAR_HANDLER_HASH_MODE, '_value_fallback', hash_mode):
         yield
 
 @contextmanager
 def context_temp_hash_mode_environ(hash_mode: Optional[str]):
-    with nullcontext() if (not hash_mode) else temp_environ(DOORWAY_HASH_MODE=hash_mode):
+    with nullcontext() if (not hash_mode) else ctx_temp_environ(DOORWAY_HASH_MODE=hash_mode):
         yield
 
 @contextmanager
 def context_temp_hash_algo_environ(hash_algo: Optional[str]):
-    with nullcontext() if (not hash_algo) else temp_environ(DOORWAY_HASH_ALGO=hash_algo):
+    with nullcontext() if (not hash_algo) else ctx_temp_environ(DOORWAY_HASH_ALGO=hash_algo):
         yield
 
 @contextmanager
 def context_temp_hash_mode_default(hash_mode: Optional[str]):
-    with nullcontext() if (not hash_mode) else temp_attr(doorway._hash._VAR_HANDLER_HASH_MODE, '_value_default', hash_mode):
+    with nullcontext() if (not hash_mode) else ctx_temp_attr(doorway._hash._VAR_HANDLER_HASH_MODE, '_value_default', hash_mode):
         yield
 
 
@@ -338,7 +338,7 @@ def test_variable_handler():
     assert handler.allowed_values == ['1', '2', '3']
     # environ values
     assert handler.get_value() == '1'
-    with temp_environ(VAR_HANDLER='3'):
+    with ctx_temp_environ(VAR_HANDLER='3'):
         assert handler.get_value() == '3'
     assert handler.get_value() == '1'
     # checks
