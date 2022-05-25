@@ -38,7 +38,6 @@ LOG = logging.getLogger(__name__)
 # TODO: combine all these functions
 
 
-
 def modify_file_name(file: Union[str, Path], prefix: str = None, suffix: str = None, sep='.') -> Union[str, Path]:
     # get path components
     path = Path(file)
@@ -86,6 +85,18 @@ def modify_ext(file: Union[str, Path], ext: str, name_contains_sep: bool = True)
     new_path = path.parent.joinpath(name)
     # return path with same format as input
     return str(new_path) if isinstance(file, str) else new_path
+
+
+# ========================================================================= #
+# export                                                                    #
+# ========================================================================= #
+
+
+__all__ = (
+    'modify_file_name',
+    'modify_name_keep_ext',
+    'modify_ext',
+)
 
 
 # ========================================================================= #
