@@ -24,10 +24,10 @@
 
 import pytest
 
-from doorway._dev import UriMalformedException
-from doorway._dev import EnumUriType
-from doorway._dev import uri_parse
-from doorway._dev import uri_validate
+from doorway.x._uri import UriMalformedException
+from doorway.x._uri import EnumUriType
+from doorway.x._uri import uri_parse
+from doorway.x._uri import uri_validate
 
 
 # ========================================================================= #

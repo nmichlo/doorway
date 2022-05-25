@@ -25,6 +25,8 @@
 import logging
 import os
 
+from doorway.x._atomic import AtomicSaveFile
+
 
 LOG = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ LOG = logging.getLogger(__name__)
 # ========================================================================= #
 
 
-def download_file(url: str, save_path: str, overwrite_existing: bool = False, chunk_size: int = 16384):
+def io_download(url: str, save_path: str, overwrite_existing: bool = False, chunk_size: int = 16384):
     import requests
     from tqdm import tqdm
     # write the file
@@ -45,14 +47,14 @@ def download_file(url: str, save_path: str, overwrite_existing: bool = False, ch
         if total_length is not None:
             total_length = int(total_length)
         # download with progress bar
-        log.info(f'Downloading: {url} to: {save_path}')
+        LOG.info(f'Downloading: {url} to: {save_path}')
         with tqdm(total=total_length, desc=f'Downloading', unit='B', unit_scale=True, unit_divisor=1024) as progress:
             for data in response.iter_content(chunk_size=chunk_size):
                 file.write(data)
                 progress.update(chunk_size)
 
 
-def copy_file(src: str, dst: str, overwrite_existing: bool = False):
+def io_copy(src: str, dst: str, overwrite_existing: bool = False):
     # copy the file
     if os.path.abspath(src) == os.path.abspath(dst):
         raise FileExistsError(f'input and output paths for copy are the same, skipping: {repr(dst)}')
@@ -62,12 +64,12 @@ def copy_file(src: str, dst: str, overwrite_existing: bool = False):
             shutil.copyfile(src, path)
 
 
-def retrieve_file(src_uri: str, dst_path: str, overwrite_existing: bool = False):
-    uri, is_url = parse_uri_and_type(src_uri)
-    if is_url:
-        download_file(url=uri, save_path=dst_path, overwrite_existing=overwrite_existing)
-    else:
-        copy_file(src=uri, dst=dst_path, overwrite_existing=overwrite_existing)
+# def io_retrieve(src_uri: str, dst_path: str, overwrite_existing: bool = False):
+#     uri, is_url = parse_uri_and_type(src_uri)
+#     if is_url:
+#         io_download(url=uri, save_path=dst_path, overwrite_existing=overwrite_existing)
+#     else:
+#         io_copy(src=uri, dst=dst_path, overwrite_existing=overwrite_existing)
 
 
 
@@ -100,18 +102,15 @@ def retrieve_file(src_uri: str, dst_path: str, overwrite_existing: bool = False)
 #     return ensure_dir_exists(*join_paths, is_file=True, absolute=True)
 
 
-
 # ========================================================================= #
 # export                                                                    #
 # ========================================================================= #
 
 
-# __all__ = (
-#     'AtomicSaveFile',
-#     'download_file',
-#     'copy_file',
-#     'retrieve_file',
-# )
+__all__ = (
+    'io_download',
+    'io_copy',
+)
 
 
 # ========================================================================= #

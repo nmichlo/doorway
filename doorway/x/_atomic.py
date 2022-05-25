@@ -30,8 +30,7 @@ from typing import Optional
 from typing import Union
 from uuid import uuid4
 
-from doorway._uri import parse_uri_and_type
-from doorway._uri import modify_file_name
+from doorway.x._modify_path import modify_file_name
 
 
 log = logging.getLogger(__name__)
@@ -135,3 +134,18 @@ class AtomicSaveFile(object):
         # move the temp file to the target file
         log.info(f'moved temporary file to final location: {self.tmp_file} -> {self.trg_file}')
         os.rename(self.tmp_file, self.trg_file)
+
+
+# ========================================================================= #
+# export                                                                    #
+# ========================================================================= #
+
+
+__all__ = (
+    'AtomicSaveFile',
+)
+
+
+# ========================================================================= #
+# END                                                                       #
+# ========================================================================= #

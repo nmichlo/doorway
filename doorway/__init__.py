@@ -29,3 +29,4 @@ from doorway._stale import *
 
 # colors
 import doorway._colors as c
+import doorway.x as x

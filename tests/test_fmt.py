@@ -24,9 +24,9 @@
 
 import pytest
 
-from doorway import fmt_use_colors_set_default
-from doorway import fmt_use_colors_get
-from doorway import fmt_bytes_to_human
+from doorway._fmt import fmt_use_colors_set_default
+from doorway._fmt import fmt_use_colors_get
+from doorway._fmt import fmt_bytes_to_human
 from tests.util import temp_environ
 
 
