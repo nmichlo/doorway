@@ -124,19 +124,6 @@ def sharded_and_grouped(
     return splits
 
 
-def shards_deterministic(*args, **kwargs):
-    import warnings
-    warnings.warn('replace `shards_deterministic` with `sharded`')
-    return sharded(*args, **kwargs)
-
-
-def shards_deterministic_grouped(*args, **kwargs):
-    import warnings
-    warnings.warn('replace `shards_deterministic_grouped` with `sharded_and_grouped`')
-    return sharded(*args, **kwargs)
-
-
-
 # ========================================================================= #
 # export                                                                    #
 # ========================================================================= #
@@ -147,9 +134,6 @@ __all__ = (
     'shard_idx',
     'sharded',
     'sharded_and_grouped',
-    # deprecated
-    'shards_deterministic',
-    'shards_deterministic_grouped',
 )
 
 
