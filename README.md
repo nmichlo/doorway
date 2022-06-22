@@ -54,3 +54,9 @@ Doorway includes the following features:
 - Atomic file writing and overwriting via a seperate temporary file that is moved into place
 - File renaming without affecting the extension
 - File renaming to replace the extension
+
+## Coming Soon
+
+- Docs
+- Examples
+
