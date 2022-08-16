@@ -25,7 +25,8 @@
 import logging
 import os
 
-from doorway.x._atomic import AtomicSaveFile
+from doorway.x._atomic import AtomicOpen
+from doorway.x._atomic import AtomicPath
 
 
 LOG = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ def io_download(url: str, save_path: str, overwrite_existing: bool = False, chun
     import requests
     from tqdm import tqdm
     # write the file
-    with AtomicSaveFile(file=save_path, open_mode='wb', overwrite=overwrite_existing) as (_, file):
+    with AtomicOpen(save_path, 'wb' if overwrite_existing else 'xb') as fp:
         response = requests.get(url, stream=True)
         total_length = response.headers.get('content-length')
         # cast to integer if content-length exists on response
@@ -50,7 +51,7 @@ def io_download(url: str, save_path: str, overwrite_existing: bool = False, chun
         LOG.info(f'Downloading: {url} to: {save_path}')
         with tqdm(total=total_length, desc=f'Downloading', unit='B', unit_scale=True, unit_divisor=1024) as progress:
             for data in response.iter_content(chunk_size=chunk_size):
-                file.write(data)
+                fp.write(data)
                 progress.update(chunk_size)
 
 
@@ -60,7 +61,7 @@ def io_copy(src: str, dst: str, overwrite_existing: bool = False):
         raise FileExistsError(f'input and output paths for copy are the same, skipping: {repr(dst)}')
     else:
         import shutil
-        with AtomicSaveFile(file=dst, overwrite=overwrite_existing) as path:
+        with AtomicPath(dst, overwrite=overwrite_existing) as path:
             shutil.copyfile(src, path)
 
 
