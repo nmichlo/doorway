@@ -42,10 +42,12 @@ LOG = logging.getLogger(__name__)
 # Atomic file saving                                                        #
 # ========================================================================= #
 
+
 _MODE_REPLACE = 'w'
 _MODE_MISSING = 'x'
 _MODE_TRY_COPY = 'a'
 _MODE_EXISTING = 'r+'
+
 
 class AtomicPath(object):
     """
@@ -59,7 +61,7 @@ class AtomicPath(object):
     ```
     with AtomicPath('file.txt') as tmp_path:
         with open(tmp_file, 'w') as f:
-            f.write("hello world!\n")
+            f.write('hello world!\n')
     ```
     """
 
@@ -84,14 +86,14 @@ class AtomicPath(object):
     # +----------------------------------------------------------------+
 
     # SUPPORTED MODES:
-    # 'replace' : overwrite, assert temp file created in context and then move to destination
+    # 'r' : overwrite, assert temp file created in context and then move to destination
     #     | like open(..., 'w'): write which truncates the file
-    # 'missing' : exclusive, assert temp file created in context but fail if destination exists
+    # 'x' : exclusive, assert temp file created in context but fail if dest. exists
     #     | like open(..., 'x'): exclusive create which fails if the file already exists
-    # 'try_copy' : append, copy data to temp file if it exists, then move back to destination
-    #     | like open(..., 'a'): append which appends to the end of the file if it exists
-    # 'existing': required, copy data to temp file, then move back to destination
-    #     | like open(..., 'r+'): which requires the file to exist
+    # 'a' : append, copy data to temp file if it exists, then move back to destination
+    #     | like open(..., 'a'): append which appends to end of file if it exists
+    # 'r+': required, copy data to temp file, then move back to destination
+    #     | like open(..., 'r+'): read which requires the file to exist
 
     # UNSUPPORTED MODES:
     # 'r': open for reading
@@ -235,43 +237,42 @@ class AtomicOpen(object):
         # obtain the basic mode from the actual mode
         if 'r' in mode:
             basic_mode = _MODE_EXISTING if ('+' in mode) else None
-        elif "x" in mode:
+        elif 'x' in mode:
             basic_mode = _MODE_MISSING
-        elif "w" in mode:
+        elif 'w' in mode:
             basic_mode = _MODE_REPLACE
-        elif "a" in mode:
+        elif 'a' in mode:
             basic_mode = _MODE_TRY_COPY
         else:
             raise ValueError(f'invalid mode: {repr(mode)}, must contain: r/x/w/a')
 
         # set the class vars
         self._open_mode = mode
-        self._basic_mode = basic_mode
         self._file_io = None
+        self._orig_path = file
 
         # handle the different basic modes
-        if self._basic_mode is None:
-            self._orig_path = file
+        if basic_mode is None:
+            self._atomic_path = None
         else:
             self._atomic_path = AtomicPath(
                 file=file,
-                mode=self._basic_mode,
+                mode=basic_mode,
                 makedirs=makedirs,
                 tmp_prefix=tmp_prefix,
                 tmp_suffix=tmp_suffix,
             )
 
     def __enter__(self) -> Union[TextIO, BinaryIO]:
-        if self._basic_mode is None:
-            # we should be in read-only mode
+        # - we should be in read-only mode
+        if self._atomic_path is None:
             tmp_path = self._orig_path
-            # actually create and open the file
             LOG.debug(f'opening original file: {tmp_path} with mode: {self._open_mode}')
+        # - prepare like usual
         else:
-            # prepare like usual
             tmp_path = self._atomic_path.__enter__()
-            # actually create and open the file
             LOG.debug(f'opening temporary file: {tmp_path} with mode: {self._open_mode}')
+
         # open and return the file
         self._file_io = open(tmp_path, self._open_mode)
         return self._file_io
@@ -283,7 +284,7 @@ class AtomicOpen(object):
         finally:
             self._file_io = None
         # cleanup like usual if we are not in read-only mode
-        if self._basic_mode is not None:
+        if self._atomic_path is not None:
             self._atomic_path.__exit__(error_type, error, traceback)
 
 
