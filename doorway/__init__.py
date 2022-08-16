@@ -22,6 +22,7 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+from doorway._atomic import *
 from doorway._ctx import *
 from doorway._fmt import *
 from doorway._hash import *

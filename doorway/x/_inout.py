@@ -25,8 +25,8 @@
 import logging
 import os
 
-from doorway.x._atomic import AtomicOpen
-from doorway.x._atomic import AtomicPath
+from doorway._atomic import AtomicOpen
+from doorway._atomic import AtomicPath
 
 
 LOG = logging.getLogger(__name__)
