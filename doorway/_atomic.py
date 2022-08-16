@@ -25,6 +25,7 @@
 
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import BinaryIO
 from typing import Optional
@@ -41,6 +42,10 @@ LOG = logging.getLogger(__name__)
 # Atomic file saving                                                        #
 # ========================================================================= #
 
+_MODE_REPLACE = 'w'
+_MODE_MISSING = 'x'
+_MODE_TRY_COPY = 'a'
+_MODE_EXISTING = 'r+'
 
 class AtomicPath(object):
     """
@@ -58,21 +63,61 @@ class AtomicPath(object):
     ```
     """
 
+    # +----------------+-----+-----+-----+-----+-----+-----+-----+-----+
+    # | DESCRIPTION    |  r  |  r+ |  w  |  w+ |  a  |  a+ |  x  |  x+ |
+    # |----------------+-----+-----+-----+-----+-----+-----+-----+-----|
+    # | read           |  *  |  *  |     |  *  |     |  *  |     |  *  |
+    # | write          |     |  *  |  *  |  *  |  *  |  *  |  *  |  *  |
+    # |----------------+-----+-----+-----+-----+-----+-----+-----+-----|
+    # | create         |     |     |  *  |  *  |  *  |  *  |  *  |  *  |
+    # | truncate       |     |     |  *  |  *  |     |     |  O  |  O  |
+    # |----------------+-----+-----+-----+-----+-----+-----+-----+-----|
+    # | must exist     |  *  |  *  |     |     |     |     |     |     |
+    # | overwrite      |     |     |  *  |  *  |     |     |     |     |
+    # | append         |     |     |     |     |  *  |  *  |     |     |
+    # | must not exist |     |     |     |     |     |     |  *  |  *  |
+    # |----------------+-----+-----+-----+-----+-----+-----+-----+-----|
+    # | seek to start  |  *  |  *  |  *  |  *  |     |     |  *  |  *  |
+    # | seek to end    |     |     |     |     |  *  |  *  |     |     |
+    # |----------------+-----+-----+-----+-----+-----+-----+-----+-----|
+    # | O: special case, must not exist, so truncated by default       |
+    # +----------------------------------------------------------------+
+
+    # SUPPORTED MODES:
+    # 'replace' : overwrite, assert temp file created in context and then move to destination
+    #     | like open(..., 'w'): write which truncates the file
+    # 'missing' : exclusive, assert temp file created in context but fail if destination exists
+    #     | like open(..., 'x'): exclusive create which fails if the file already exists
+    # 'try_copy' : append, copy data to temp file if it exists, then move back to destination
+    #     | like open(..., 'a'): append which appends to the end of the file if it exists
+    # 'existing': required, copy data to temp file, then move back to destination
+    #     | like open(..., 'r+'): which requires the file to exist
+
+    # UNSUPPORTED MODES:
+    # 'r': open for reading
+    # 'U': universal newlines mode
+
     def __init__(
         self,
         file: Union[str, Path],
-        overwrite: bool = False,
+        mode: str = _MODE_MISSING,
         makedirs: bool = False,
         tmp_prefix: Optional[str] = '.temp.',
         tmp_suffix: Optional[str] = None,
     ):
-        from uuid import uuid4
-
         # check files
-        if not file or not Path(file).name:
+        if (not file) or Path(file).name in ('', '.', '..'):
             raise ValueError(f'file must not be empty: {repr(file)}')
 
-        # get files
+        # check the mode
+        if mode not in (_MODE_TRY_COPY, _MODE_REPLACE, _MODE_MISSING, _MODE_EXISTING):
+            raise ValueError(
+                f'invalid mode: {repr(mode)}, '
+                f'must be one of: {_MODE_TRY_COPY}/{_MODE_REPLACE}/{_MODE_MISSING}/{_MODE_EXISTING} (try_copy/replace/missing/existing)'
+            )
+
+        # get the actual files
+        from uuid import uuid4
         self._dst_path = Path(file).absolute()
         self._tmp_path = modify_file_name(self._dst_path, prefix=f'{tmp_prefix}{uuid4()}', suffix=tmp_suffix)
 
@@ -85,74 +130,89 @@ class AtomicPath(object):
 
         # other settings
         self._makedirs = makedirs
-        self._overwrite = overwrite
+        self._mode = mode
 
-    def __enter__(self) -> Union[Path, TextIO, BinaryIO]:
-        # check that the temporary file does not already exist
+    def __enter__(self) -> Path:
+        # 1. check that the temporary file does not already exist
+        #    this should be impossible
         if self._tmp_path.exists():
-            raise RuntimeError(f'the temporary file already exists: {self._tmp_path}, this should never happen.')
-        # check that the destination file does not already exist
-        if self._dst_path.exists():
-            if not self._overwrite:
-                raise FileExistsError(f'the destination file already exists: {self._dst_path}, set `overwrite=True` to ignore this error.')
-            if not self._dst_path.is_file():
-                raise RuntimeError(f'the destination file exists but is not a file: {self._dst_path}')
+            raise RuntimeError(f'the temporary file already exists: {self._tmp_path}, this is a bug!')
 
-        # create the missing parent directory if specified
-        # and check that this directory actually exists
+        # 2. handle the different modes for when the destination file exists
+        # - make sure the destination does not exist
+        if self._mode == _MODE_MISSING:
+            if self._dst_path.exists():
+                raise FileExistsError(f'the destination file should not exist: {self._dst_path}')
+        # - make sure the destination can be replaced
+        elif self._mode == _MODE_REPLACE:
+            if self._dst_path.exists():
+                if not self._dst_path.is_file():
+                    raise IsADirectoryError(f'the destination file exists but is not a file: {self._dst_path}')
+        # - make sure the destination can be replaced and try copy it
+        elif self._mode in (_MODE_REPLACE, _MODE_TRY_COPY, _MODE_EXISTING):
+            if self._dst_path.exists():
+                if not self._dst_path.is_file():
+                    raise IsADirectoryError(f'the destination file exists but is not a file: {self._dst_path}')
+                shutil.copy(self._dst_path, self._tmp_path)
+        # - make sure the destination exists, can be replaced and copy it
+        elif self._mode == _MODE_EXISTING:
+            if not self._dst_path.exists():
+                raise FileExistsError(f'the destination file should exist: {self._dst_path}')
+            elif not self._dst_path.is_file():
+                raise FileExistsError(f'the destination file exists but is not a file: {self._dst_path}')
+            shutil.copy(self._dst_path, self._tmp_path)
+        # - make sure the mode is valid
+        else:
+            raise NotImplementedError(f'invalid mode: {self._mode}, this is a bug!')
+
+        # 3. create the missing parent directory if specified
         if self._makedirs:
             self._tmp_path.parent.mkdir(parents=True, exist_ok=True)
-        if not self._tmp_path.parent.is_dir():
-            raise NotADirectoryError(f'the parent directory of the temporary file does not exist: {self._tmp_path.parent}, set `makedirs=True` to ignore this error.')
 
-        # handle the different modes
+        # return the path to the temp file
         return self._tmp_path
 
     def __exit__(self, error_type, error, traceback):
-        # cleanup if there was an error, and exit early
-        # NOTE: this assumes the user respected creating a file,
-        #       a directory won't be removed.
+        # 0. cleanup if there was an error, and exit early
         if error_type is not None:
             if self._tmp_path.exists():
+                if self._tmp_path.is_dir():
+                    raise RuntimeError(f'An error occured in {self.__class__.__name__}, but could not clean up the temporary file because it is a directory: {self._tmp_path}')
                 self._tmp_path.unlink(missing_ok=True)
                 LOG.error(f'An error occurred in {self.__class__.__name__}, deleted temporary file: {self._tmp_path}')
             else:
                 LOG.error(f'An error occurred in {self.__class__.__name__}')
             return
 
-        # the temp file must have been created at this point
+        # 1. check that the temporary file was created in this context
         if not self._tmp_path.exists():
             raise FileNotFoundError(f'the temporary file was not created: {self._tmp_path}')
         if not self._tmp_path.is_file():
             raise RuntimeError(f'the temporary file is not a file: {self._tmp_path}')
 
-        # delete the destination file if it exists and overwrite is enabled:
-        # NOTE: this assumes the user respected creating a file,
-        #       a directory won't be removed.
-        if self._overwrite:
+        # 2. handle the different modes, we perform some checks again just to be safe
+        # - make sure the destination does not exist
+        if self._mode == _MODE_MISSING:
             if self._dst_path.exists():
-                LOG.warning(f'overwriting file: {self._dst_path}')
-                self._dst_path.unlink(missing_ok=True)
+                raise FileExistsError(f'the destination file should not exist: {self._dst_path}')
+        # - no checks needed
+        elif self._mode in (_MODE_REPLACE, _MODE_TRY_COPY, _MODE_EXISTING):
+            pass
+        # - make sure the mode is valid
+        else:
+            raise NotImplementedError(f'invalid mode: {self._mode}, this is a bug!')
 
-        # create the missing output directories if needed
-        if self._makedirs:
-            self._dst_path.parent.mkdir(parents=True, exist_ok=True)
-        if not self._dst_path.parent.is_dir():
-            raise NotADirectoryError(f'the parent directory of the destination file does not exist: {self._dst_path.parent}, set `makedirs=True` to ignore this error.')
-
-        # move the temp file to the destination file
-        LOG.info(f'moved temporary file to final location: {self._tmp_path} -> {self._dst_path}')
+        # 3. move the temp file to the destination file. `os.rename` is usually
+        # guaranteed to be atomic on linux and also overwrites the destination path
+        LOG.info(f'moving temporary file to final location: {self._tmp_path} -> {self._dst_path}')
         os.rename(self._tmp_path, self._dst_path)
 
 
 class AtomicOpen(object):
 
-    # UNSUPPORTED MODES:
+    # SUPPORTED MODES:
     # 'r': open for reading (default)
     # 'a': open for writing, appending to the end of the file if it exists
-    # 'U': universal newlines mode (deprecated)
-
-    # SUPPORTED MODES:
     # 'w': open for writing, truncating the file first
     # 'x': open for exclusive creation, failing if the file already exists
 
@@ -160,6 +220,9 @@ class AtomicOpen(object):
     # 't': text mode (default)
     # '+': open a disk file for updating (reading and writing)
     # 'b': binary mode
+
+    # UNSUPPORTED MODES:
+    # 'U': universal newlines mode (deprecated)
 
     def __init__(
         self,
@@ -169,49 +232,59 @@ class AtomicOpen(object):
         tmp_prefix: Optional[str] = '.temp.',
         tmp_suffix: Optional[str] = None,
     ):
-        # set the overwrite mode based on `x` or `w`
-        if "x" in mode:
-            overwrite, copy_orig = False, False
+        # obtain the basic mode from the actual mode
+        if 'r' in mode:
+            basic_mode = _MODE_EXISTING if ('+' in mode) else None
+        elif "x" in mode:
+            basic_mode = _MODE_MISSING
         elif "w" in mode:
-            overwrite, copy_orig = True, False
+            basic_mode = _MODE_REPLACE
         elif "a" in mode:
-            overwrite, copy_orig = True, True
-            raise NotImplementedError('mode "a" is unsupported')
-        elif "r" in mode:
-            overwrite, copy_orig = False, True
-            raise NotImplementedError('mode "r" is unsupported')
+            basic_mode = _MODE_TRY_COPY
         else:
-            raise ValueError(f'the mode: {repr(mode)} is invalid')
+            raise ValueError(f'invalid mode: {repr(mode)}, must contain: r/x/w/a')
 
-        # standard path context manager
-        self._atomic_path = AtomicPath(
-            file=file,
-            overwrite=overwrite,
-            makedirs=makedirs,
-            tmp_prefix=tmp_prefix,
-            tmp_suffix=tmp_suffix,
-        )
-
-        # resources
+        # set the class vars
         self._open_mode = mode
-        self._resource = None
+        self._basic_mode = basic_mode
+        self._file_io = None
 
-    def __enter__(self):
-        # prepare like usual
-        tmp_path = self._atomic_path.__enter__()
-        # actually create and open the file
-        LOG.debug(f'opening temporary file: {tmp_path} with mode: {self._open_mode}')
-        self._resource = open(tmp_path, self._open_mode)
-        return self._resource
+        # handle the different basic modes
+        if self._basic_mode is None:
+            self._orig_path = file
+        else:
+            self._atomic_path = AtomicPath(
+                file=file,
+                mode=self._basic_mode,
+                makedirs=makedirs,
+                tmp_prefix=tmp_prefix,
+                tmp_suffix=tmp_suffix,
+            )
+
+    def __enter__(self) -> Union[TextIO, BinaryIO]:
+        if self._basic_mode is None:
+            # we should be in read-only mode
+            tmp_path = self._orig_path
+            # actually create and open the file
+            LOG.debug(f'opening original file: {tmp_path} with mode: {self._open_mode}')
+        else:
+            # prepare like usual
+            tmp_path = self._atomic_path.__enter__()
+            # actually create and open the file
+            LOG.debug(f'opening temporary file: {tmp_path} with mode: {self._open_mode}')
+        # open and return the file
+        self._file_io = open(tmp_path, self._open_mode)
+        return self._file_io
 
     def __exit__(self, error_type, error, traceback):
         # close the temp file
         try:
-            self._resource.close()
+            self._file_io.close()
         finally:
-            self._resource = None
-        # cleanup like usual
-        self._atomic_path.__exit__(error_type, error, traceback)
+            self._file_io = None
+        # cleanup like usual if we are not in read-only mode
+        if self._basic_mode is not None:
+            self._atomic_path.__exit__(error_type, error, traceback)
 
 
 # ========================================================================= #
