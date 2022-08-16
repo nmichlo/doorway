@@ -80,26 +80,60 @@ def fmt_bytes_to_human(
     decimals: int = 3,
     align: bool = False,
     use_colors: Optional[bool] = None,
+    round_unit: bool = True,
 ) -> str:
-    # TODO: this does not yet handle values greater than YB or YiB
+    """
+    Obtain the human-readable string representation of the given bytes
+
+    NOTE: this does not handle values greater than "YB" or "YiB"
+          as there is no official SI unit above these
+    """
     # check the unit of measurement
+    if not isinstance(size_bytes, int):
+        raise TypeError(f'invalid size in bytes, must be of type `int`, got: {type(size_bytes)}')
+    if not isinstance(base, int):
+        raise TypeError(f'invalid bytes base number, must be of type `int`, got: {type(base)}')
+    if size_bytes < 0:
+        raise ValueError(f'invalid size in bytes, cannot be negative: {size_bytes}')
     if base not in _BYTES_UNIT_NAMES:
         raise ValueError(f'invalid bytes base number: {repr(base)} must be one of: {sorted(_BYTES_UNIT_NAMES.keys())}')
-    # compute the power
-    power = math.log(size_bytes, base) if (size_bytes != 0) else 0
-    i = int(power)
-    size_div = size_bytes / (base**i)
-    # get the unit of measurement
-    unit = _BYTES_UNIT_NAMES[base][i]
+    units = _BYTES_UNIT_NAMES[base]
+
+    # 1. compute power
+    # NOTE: This is not precise, we should rather be using Fractions and then
+    #       instead of using `math.log`, rather compute the multiples of the
+    #       bases and then checking if the size_bytes is in the required range
+    power = 0 if (size_bytes == 0) else int(math.log(size_bytes, base))
+    # bound the power by the maximum available unit
+    i = min(power, len(units) - 1)
+
+    # 2. compute formatted unit by dividing
+    # NOTE: divide in integer space to avoid precision errors, this is
+    #       a floor operation, so we never round up to the next unit,
+    #       ie.  `fmt_bytes_to_human(1024**8 - 1, base=1024) == "1023.999 ZiB"`
+    #       with this, we don't need to round and update the unit below:
+    #       `size_fmt = size_bytes // (base**max(0, i-1)) / (base**min(1, i))`
+    size_fmt = size_bytes / (base**i)
+
+    # 3. round the formatted unit and update if the unit changes
+    if round_unit:
+        size_fmt = round(size_fmt, decimals)
+        if (size_fmt >= base) and (i < len(units) - 1):
+            size_fmt = round(size_fmt / base, decimals)
+            i += 1
+
+    # obtain the actual unit strings
+    unit = units[i]
     if fmt_use_colors_get(use_colors):
         unit = f'{_BYTES_UNIT_COLORS[i]}{unit}{c.RST}'
+
     # format string
     if align:
         lpad = _BYTES_BASE_PADDING[base]
         rpad = _BYTES_UNIT_PADDING[base]
-        return f"{size_div:>{lpad+decimals}.{decimals}f} {unit:<{rpad}s}"
+        return f"{size_fmt:>{lpad+decimals}.{decimals}f} {unit:<{rpad}s}"
     else:
-        return f"{size_div:.{decimals}f} {unit}"
+        return f"{size_fmt:.{decimals}f} {unit}"
 
 
 # ========================================================================= #
