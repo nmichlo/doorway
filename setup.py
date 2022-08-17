@@ -25,14 +25,14 @@ setuptools.setup(
     author="Nathan Juraj Michlo",
     author_email="NathanJMichlo@gmail.com",
 
-    version="0.4.0",
+    version="0.5.0",
     python_requires=">=3.8",
     packages=setuptools.find_packages(),
 
     install_requires=install_requires,
 
     url="https://github.com/nmichlo/doorway",
-    description="Essential file IO utilities",
+    description="Essential utilities for working with files",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
