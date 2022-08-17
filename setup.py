@@ -32,7 +32,7 @@ setuptools.setup(
     install_requires=install_requires,
 
     url="https://github.com/nmichlo/doorway",
-    description="Essential file IO utilities",
+    description="Essential utilities for working with files",
     long_description=long_description,
     long_description_content_type="text/markdown",
 

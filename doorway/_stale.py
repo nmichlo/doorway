@@ -52,6 +52,11 @@ def stalefile_is_stale(
     hash_mode: Optional[HashMode] = None,
     hash_algo: Optional[HashAlgo] = None,
 ):
+    """
+    Check if the given path is stale:
+    - a. if the file does not exist or if it's hash does not match then return `True`
+    - b. if everything is okay then return `False`
+    """
     # compute the hash for a file
     fhash = hash_file(path=path, hash_mode=hash_mode, hash_algo=hash_algo, hash_missing=True)
     # check if the file is stale or not
@@ -76,10 +81,13 @@ def stalefile_generate(
     hash_mode: Optional[HashMode] = None,
     hash_algo: Optional[HashAlgo] = None,
 ) -> HashPath:
-    is_stale = stalefile_is_stale(path=path, hash=hash, hash_mode=hash_mode, hash_algo=hash_algo)
+    """
     # if the file is stale:
-    # - 1. produce is using the wrapped function
+    # - 1. produce the file using the wrapped function
     # - 2. validate the produced file and throw errors if it is wrong!
+    # otherwise, do nothing.
+    """
+    is_stale = stalefile_is_stale(path=path, hash=hash, hash_mode=hash_mode, hash_algo=hash_algo)
     if is_stale:
         LOG.debug(f'calling wrapped function: {make_file_fn} because the file is stale: {repr(path)}')
         make_file_fn(path)
@@ -102,9 +110,11 @@ def stalefile_decorator(
         Callable[[Callable[[HashPath], NoReturn]], Callable[[], HashPath]],
         Callable[[], HashPath],
 ]:
-    # the wrapped function should take in a path and produce a file at that location.
-    # a. if the file already exists, this function is not called!
-    # b. if the file does not exist, the function is called to generate the file, which is then validated!
+    """
+    The wrapped function should take in a path and produce a file at that location.
+    - a. if the file already exists, this function is not called!
+    - b. if the file does not exist, the function is called to generate the file, which is then validated!
+    """
     def decorator(make_file_fn: Callable[[HashPath], NoReturn]) -> Callable[[], HashPath]:
         @wraps(make_file_fn)
         def make_file_if_stale() -> HashPath:
@@ -127,11 +137,15 @@ def stalefile_decorator(
 # ========================================================================= #
 
 
-
 class Stalefile(object):
     """
-    decorator that only runs the wrapped function if a
-    file does not exist, or its hash does not match.
+    Common stalefile helper class that stores path and
+    hash information, allowing re-use.
+
+    See:
+      - `stalefile_is_stale(...)` which corresponds to `self.is_stale()`
+      - `stalefile_generate(...)` which corresponds to `self.generate(make_file_fn)`
+      - `stalefile_decorator(...)` which corresponds to `self.decorator(make_file_fn)`
     """
 
     def __init__(

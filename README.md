@@ -2,7 +2,7 @@
 <p align="center">
     <h1 align="center">🚪 Doorway</h1>
     <p align="center">
-        <i>Essential file IO utilities</i>
+        <i>Essential utilities for working with files</i>
     </p>
 </p>
 
@@ -59,4 +59,3 @@ Doorway includes the following features:
 
 - Docs
 - Examples
-
