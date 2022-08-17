@@ -22,23 +22,14 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
-import io
 import os
-import urllib.request
-from collections import defaultdict
-from datetime import timedelta
 from logging import getLogger
-from multiprocessing.pool import ThreadPool
-from random import Random
 from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
 from typing import Tuple
-
-import requests
-from tqdm import tqdm
 
 
 _LOGGER = getLogger(__name__)
@@ -95,6 +86,7 @@ def scrape_proxies(source: Optional[str] = None, proxy_type: str = 'all', cache_
     # wrap the function
     if cached:
         from cachier import cachier
+        from datetime import timedelta
         proxy_scrape_fn = cachier(
             stale_after=timedelta(days=1),
             backend='pickle',
@@ -114,6 +106,7 @@ def scrape_proxies(source: Optional[str] = None, proxy_type: str = 'all', cache_
 
 
 def _requests_get(url, fake_user_agent=True, params=None):
+    import requests
     # fake a request from a browser
     return requests.get(
         url,
@@ -226,6 +219,8 @@ class ProxyDownloadFailedError(Exception):
 
 
 def make_proxy_opener(proxy: Dict[str, str]):
+    import urllib.request
+
     if len(proxy) != 1:
         raise MalformedProxyError(f'proxy dictionaries should only have one entry, the key is the protocol, and the value is the url... invalid: {proxy}')
     # build connection
@@ -236,6 +231,7 @@ def make_proxy_opener(proxy: Dict[str, str]):
 
 
 def download_with_proxy(url: str, file: str, proxy: Dict[str, str], timeout: Optional[float] = 8):
+    import io
     data = make_proxy_opener(proxy=proxy).open(url, timeout=timeout).read()
     # download to temp file in case there is an error
     temp_file = file + '.dl'
@@ -296,6 +292,9 @@ class ProxyDownloader:
         req_min_remove_count=5,
         req_max_fail_ratio=0.5,
     ):
+        from collections import defaultdict
+        from random import Random
+
         # default proxy scraping
         if proxies is None:
             proxies = scrape_proxies()
@@ -332,6 +331,9 @@ class ProxyDownloader:
                 pass  # removed in another thread
 
     def download_threaded(self, url_file_tuples: Sequence[Tuple[str, str]], exists_mode: str = 'error', verbose: bool = False, make_dirs: bool = False, ignore_failures=False, threads=64, attempts: int = 128, timeout: int = 8):
+        from multiprocessing.pool import ThreadPool
+        from tqdm import tqdm
+
         # check inputs
         if len(url_file_tuples) < 0:
             return []
