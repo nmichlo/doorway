@@ -28,11 +28,10 @@ import os
 import shutil
 from pathlib import Path
 from typing import BinaryIO
-from typing import Optional
 from typing import TextIO
 from typing import Union
 
-from doorway.x._modify_path import path_basename_modify
+from doorway._modify_path import path_basename_modify
 
 
 LOG = logging.getLogger(__name__)

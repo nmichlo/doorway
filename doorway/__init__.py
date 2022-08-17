@@ -26,6 +26,7 @@ from doorway._atomic import *
 from doorway._ctx import *
 from doorway._fmt import *
 from doorway._hash import *
+from doorway._modify_path import *
 from doorway._shard import *
 from doorway._stale import *
 

@@ -23,5 +23,4 @@
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
 from doorway.x._inout import *
-from doorway.x._modify_path import *
 from doorway.x._uri import *
