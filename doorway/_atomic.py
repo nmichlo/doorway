@@ -32,7 +32,7 @@ from typing import Optional
 from typing import TextIO
 from typing import Union
 
-from doorway.x._modify_path import modify_file_name
+from doorway.x._modify_path import path_basename_modify
 
 
 LOG = logging.getLogger(__name__)
@@ -104,8 +104,6 @@ class AtomicPath(object):
         file: Union[str, Path],
         mode: str = _MODE_MISSING,
         makedirs: bool = False,
-        tmp_prefix: Optional[str] = '.temp.',
-        tmp_suffix: Optional[str] = None,
     ):
         # check files
         if (not file) or Path(file).name in ('', '.', '..'):
@@ -121,7 +119,10 @@ class AtomicPath(object):
         # get the actual files
         from uuid import uuid4
         self._dst_path = Path(file).absolute()
-        self._tmp_path = modify_file_name(self._dst_path, prefix=f'{tmp_prefix}{uuid4()}', suffix=tmp_suffix)
+        self._tmp_path = path_basename_modify(
+            file=self._dst_path,
+            basename_prefix=f'.temp.{uuid4()}.',
+        )
 
         # check that the files are different, but that
         # their parent directories are the same
@@ -231,8 +232,6 @@ class AtomicOpen(object):
         file: Union[str, Path],
         mode: str = 'x',
         makedirs: bool = False,
-        tmp_prefix: Optional[str] = '.temp.',
-        tmp_suffix: Optional[str] = None,
     ):
         # obtain the basic mode from the actual mode
         if 'r' in mode:
@@ -259,8 +258,6 @@ class AtomicOpen(object):
                 file=file,
                 mode=basic_mode,
                 makedirs=makedirs,
-                tmp_prefix=tmp_prefix,
-                tmp_suffix=tmp_suffix,
             )
 
     def __enter__(self) -> Union[TextIO, BinaryIO]:
