@@ -23,10 +23,7 @@
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
 import logging
-import os
-
 from doorway._atomic import AtomicOpen
-from doorway._atomic import AtomicPath
 
 
 LOG = logging.getLogger(__name__)
@@ -37,70 +34,34 @@ LOG = logging.getLogger(__name__)
 # ========================================================================= #
 
 
-def io_download(url: str, save_path: str, overwrite_existing: bool = False, chunk_size: int = 16384):
-    import requests
-    from tqdm import tqdm
+def io_download(
+    src_url: str,
+    dst_path: str,
+    overwrite_existing: bool = False,
+    chunk_size: int = 16384,
+):
+    # make sure we have the correct imports
+    try:
+        import requests
+        from tqdm import tqdm
+    except ImportError as e:
+        raise ImportError(f'`requests` and `tqdm` need to be installed for `{io_download.__name__}`') from e
+
     # write the file
-    with AtomicOpen(save_path, 'wb' if overwrite_existing else 'xb') as fp:
-        response = requests.get(url, stream=True)
+    with AtomicOpen(dst_path, 'wb' if overwrite_existing else 'xb') as fp:
+        response = requests.get(src_url, stream=True)
+
+        # get the file size from the request for the progress bar
         total_length = response.headers.get('content-length')
-        # cast to integer if content-length exists on response
         if total_length is not None:
             total_length = int(total_length)
+
         # download with progress bar
-        LOG.info(f'Downloading: {url} to: {save_path}')
+        LOG.info(f'Downloading: {src_url} to: {dst_path}')
         with tqdm(total=total_length, desc=f'Downloading', unit='B', unit_scale=True, unit_divisor=1024) as progress:
             for data in response.iter_content(chunk_size=chunk_size):
                 fp.write(data)
                 progress.update(chunk_size)
-
-
-def io_copy(src: str, dst: str, overwrite_existing: bool = False):
-    # copy the file
-    if os.path.abspath(src) == os.path.abspath(dst):
-        raise FileExistsError(f'input and output paths for copy are the same, skipping: {repr(dst)}')
-    else:
-        import shutil
-        with AtomicPath(dst, overwrite=overwrite_existing) as path:
-            shutil.copyfile(src, path)
-
-
-# def io_retrieve(src_uri: str, dst_path: str, overwrite_existing: bool = False):
-#     uri, is_url = parse_uri_and_type(src_uri)
-#     if is_url:
-#         io_download(url=uri, save_path=dst_path, overwrite_existing=overwrite_existing)
-#     else:
-#         io_copy(src=uri, dst=dst_path, overwrite_existing=overwrite_existing)
-
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-# def ensure_dir_exists(*join_paths: str, is_file=False, absolute=False):
-#     import os
-#     # join path
-#     path = os.path.join(*join_paths)
-#     # to abs path
-#     if absolute:
-#         path = os.path.abspath(path)
-#     # remove file
-#     dirs = os.path.dirname(path) if is_file else path
-#     # create missing directory
-#     if os.path.exists(dirs):
-#         if not os.path.isdir(dirs):
-#             raise IOError(f'path is not a directory: {dirs}')
-#     else:
-#         os.makedirs(dirs, exist_ok=True)
-#         log.info(f'created missing directories: {dirs}')
-#     # return directory
-#     return path
-
-
-# def ensure_parent_dir_exists(*join_paths: str):
-#     return ensure_dir_exists(*join_paths, is_file=True, absolute=True)
 
 
 # ========================================================================= #
@@ -110,7 +71,6 @@ def io_copy(src: str, dst: str, overwrite_existing: bool = False):
 
 __all__ = (
     'io_download',
-    'io_copy',
 )
 
 
