@@ -115,6 +115,35 @@ def _requests_get(url, fake_user_agent=True, params=None):
     )
 
 
+@register_proxy_scraper('proxylist.geonode.com', is_default=True)
+def _scrape_proxylist_geonode_com(proxy_type) -> List[Dict[str, str]]:
+
+    def _get_page(page):
+        r = _requests_get(
+            f'https://proxylist.geonode.com/api/proxy-list?limit=500&page={page}&sort_by=lastChecked&sort_type=desc',
+            fake_user_agent=True
+        )
+        r.raise_for_status()
+        return r.json()
+
+    proxies = []
+    page_num = 1
+    while True:
+        print(f'page_num={page_num}')
+        data = _get_page(page_num)
+        for row in data['data']:
+            proto = row['protocols'][0].upper()
+            url = f"{proto}://{row['ip']}:{row['port']}"
+            proxies.append({proto: url})
+        if page_num >= data['total']:
+            break
+        page_num += 1
+        if page_num > 3:
+            break
+
+    return proxies
+
+
 @register_proxy_scraper('morph.io')
 def _scrape_proxies_morph(proxy_type) -> List[Dict[str, str]]:
 
@@ -150,7 +179,7 @@ def _scrape_proxies_morph(proxy_type) -> List[Dict[str, str]]:
     return proxies
 
 
-@register_proxy_scraper('free-proxy-list.net', is_default=True)
+@register_proxy_scraper('free-proxy-list.net')
 def _scrape_proxies_freeproxieslist(proxy_type) -> List[Dict[str, str]]:
     def can_add(https):
         if proxy_type == 'all':
