@@ -23,6 +23,9 @@
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
 import logging
+import os
+import warnings
+
 from doorway._atomic import AtomicOpen
 
 
@@ -38,6 +41,7 @@ def io_download(
     src_url: str,
     dst_path: str,
     overwrite_existing: bool = False,
+    skip_existing: bool = False,
     chunk_size: int = 16384,
 ):
     # make sure we have the correct imports
@@ -46,6 +50,15 @@ def io_download(
         from tqdm import tqdm
     except ImportError as e:
         raise ImportError(f'`requests` and `tqdm` need to be installed for `{io_download.__name__}`') from e
+
+    # skip existing
+    if skip_existing:
+        if overwrite_existing:
+            warnings.warn('`overwrite_existing` takes precedence over `skip_existing`')
+        else:
+            if os.path.exists(dst_path):
+                LOG.info(f'Skipping: {dst_path}')
+                return
 
     # write the file
     with AtomicOpen(dst_path, 'wb' if overwrite_existing else 'xb') as fp:
