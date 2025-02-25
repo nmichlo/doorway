@@ -229,7 +229,7 @@ class AtomicOpen(object):
     def __init__(
         self,
         file: Union[str, Path],
-        mode: str = 'x',
+        mode: str = 'r',
         makedirs: bool = False,
     ):
         # obtain the basic mode from the actual mode
