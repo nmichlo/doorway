@@ -24,7 +24,7 @@
 
 import os
 from logging import getLogger
-from typing import Callable
+from typing import Callable, Iterable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -317,7 +317,7 @@ class ProxyDownloader:
 
     def __init__(
         self,
-        proxies: Optional[Sequence[Dict[str, str]]],
+        proxies: Sequence[Dict[str, str]] | None | str = None,
         req_min_remove_count=5,
         req_max_fail_ratio=0.5,
     ):
@@ -327,6 +327,8 @@ class ProxyDownloader:
         # default proxy scraping
         if proxies is None:
             proxies = scrape_proxies()
+        elif isinstance(proxies, str):
+            proxies = scrape_proxies(source=proxies)
         # convert
         self._proxies = list(proxies)  # TODO: add support for raw proxy strings?
         # proxy statistics
@@ -359,13 +361,17 @@ class ProxyDownloader:
             except (ValueError, KeyError):
                 pass  # removed in another thread
 
-    def download_threaded(self, url_file_tuples: Sequence[Tuple[str, str]], exists_mode: str = 'error', verbose: bool = False, make_dirs: bool = False, ignore_failures=False, threads=64, attempts: int = 128, timeout: int = 8):
+    def download_threaded(self, url_file_tuples: Iterable[Tuple[str, str]], exists_mode: str = 'error', verbose: bool = False, make_dirs: bool = False, ignore_failures=False, threads=64, attempts: int = 128, timeout: int = 8):
         from multiprocessing.pool import ThreadPool
         from tqdm import tqdm
 
         # check inputs
-        if len(url_file_tuples) < 0:
-            return []
+        try:
+            total = len(url_file_tuples)
+            if total <= 0:
+                return []
+        except TypeError:
+            total = None
 
         def download(url_file):
             url, file = url_file
@@ -387,7 +393,7 @@ class ProxyDownloader:
         # download all files, keeping track of failed items!
         failed = []
         with ThreadPool(processes=threads) as pool:
-            with tqdm(desc=get_desc(), total=len(url_file_tuples)) as pbar:
+            with tqdm(desc=get_desc(), total=total) as pbar:
                 for pair in pool.imap_unordered(download, url_file_tuples):
                     if pair:
                         failed.append(pair)
