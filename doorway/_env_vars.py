@@ -23,22 +23,29 @@
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
 __all__ = (
-    "EnvVarHandlerBase",
-    "EnvVarHandlerStr",
-    "EnvVarHandlerBool",
-    "EnvVarHandlerInt",
+    "EnvVar",
     # errors
     "EnvVarError",
     "EnvVarValidationError",
     "EnvVarConversionError",
+    "EnvVarMissingError",
 )
 
-import abc
 import os
-from typing import List, Optional
+from typing import Callable, Iterable, Optional
 from typing import Sequence
 from typing import Generic
 from typing import TypeVar
+
+
+# ========================================================================= #
+# Types                                                                     #
+# ========================================================================= #
+
+
+T = TypeVar("T")
+EnvVarFnConverterHint = Callable[[str], T]
+EnvVarFnValidatorHint = Callable[[T], T]
 
 
 # ========================================================================= #
@@ -47,14 +54,26 @@ from typing import TypeVar
 
 
 class EnvVarError(ValueError):
+    """Base exception for environment variable errors."""
+
+    pass
+
+
+class EnvVarMissingError(EnvVarError):
+    """Raised when a value is missing."""
+
     pass
 
 
 class EnvVarValidationError(EnvVarError):
+    """Raised when a value fails validation."""
+
     pass
 
 
 class EnvVarConversionError(EnvVarError):
+    """Raised when converting an environment variable string fails."""
+
     pass
 
 
@@ -63,241 +82,227 @@ class EnvVarConversionError(EnvVarError):
 # ========================================================================= #
 
 
-T = TypeVar("T")
-
-
-class EnvVarHandlerBase(Generic[T], abc.ABC):
+class EnvVar(Generic[T]):
     """
-    Base class for managing variables that can be set via environment variables.
+    A flexible handler for environment variables of any type.
+
+    priority:
+      0. validated force (if set, passed in)
+      1. validated override (if set, from constructor)
+      2. validated + converted environment variable (if set, from os.environ)
+      3. validated default value (if set, passed in)
+      4. validated fallback value (if set, from constructor)
+      5. raise error if the value is missing (None)
     """
 
     def __init__(
         self,
-        environ_key: str,
-        fallback_value: T,
+        key: str,
         *,
-        identifier: Optional[str] = None,
+        default: Optional[T] = None,
+        converter: Optional[EnvVarFnConverterHint[T]] = None,  # applied to env str
+        validator: Optional[EnvVarFnValidatorHint[T]] = None,  # applied to all values
     ):
-        if identifier is None:
-            identifier = environ_key.lower()
-        self._identifier = identifier
-        self._environ_key = environ_key
-        assert str.isidentifier(self._environ_key)
-        assert str.isidentifier(self._identifier)
-        # default
-        self._value_default = None
-        # values
-        self._value_fallback = fallback_value
-        self._validate_value(self._value_fallback, source="fallback_value")
-
-    # OVERRIDEABLE
-
-    @abc.abstractmethod
-    def _validate_value(self, value: T, source: str) -> None:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def _normalize_environ_value(self, value: str) -> T:
-        raise NotImplementedError
-
-    # COMMON - PROPS
+        self._key = key
+        self._env_converter = converter
+        self._val_validator = validator
+        # do not apply validator until get, more inefficient, but easier to test
+        self._persisted_default = default  # value not passed through convert, only val
+        self._persisted_override = None  # value not passed through convert, only val
 
     @property
-    def identifier(self) -> str:
-        return self._identifier
+    def env_key(self) -> str:
+        return self._key
+
+    # set or / clear with `None`
+
+    def set_default_value(self, value: Optional[T]) -> None:
+        # do not apply validator until get, more inefficient, but easier to test
+        self._persisted_default = value
+
+    def set_override_value(self, value: Optional[T]) -> None:
+        # do not apply validator until get, more inefficient, but easier to test
+        self._persisted_override = value
+
+    # get
 
     @property
-    def environ_key(self) -> str:
-        return self._environ_key
+    def value(self) -> T:
+        return self.get()
 
-    @property
-    def fallback_value(self) -> T:
-        return self._value_fallback
+    def __call__(
+        self, *, default: Optional[T] = None, override: Optional[T] = None
+    ) -> T:
+        return self.get(default=default, override=override)
 
-    # COMMON - FUNCS
+    def get(self, *, default: Optional[T] = None, override: Optional[T] = None) -> T:
+        # convert / extract values
 
-    def set_default_value(self, value: Optional[T] = None) -> None:
-        # make sure the hash_algo is valid
-        if value is not None:
-            self._validate_value(value, source="set_default_value")
-        # update the default mode
-        self._value_default = value
-
-    def del_default_value(self) -> None:
-        self._value_default = None
-
-    def get_value(self, override: Optional[T] = None) -> T:
-        """
-        priority:
-          1. manual specification
-          2. default mode (set_default_value)
-          3. environment variable
-          4. fallback mode ("fast")
-        """
         if override is not None:
-            source, value = ("manual", override)
-        elif self._value_default is not None:
-            source, value = ("default", self._value_default)
-        elif self._environ_key in os.environ:
-            source, value = (
-                "environment",
-                self._normalize_environ_value(os.environ[self._environ_key]),
-            )
+            source = "call_override"
+            result = override
+        elif self._persisted_override is not None:
+            source = "persisted_override"
+            result = self._persisted_override  # already validated in constructor
+        elif self._key in os.environ:
+            source = "env_value"
+            try:
+                result = self._env_converter(os.environ[self._key])
+            except Exception as e:
+                raise EnvVarConversionError(
+                    f"error getting {repr(self._key)} from os.environ, conversion failed: {e}"
+                ) from e
+        elif default is not None:
+            source = "call_default"
+            result = default
+        elif self._persisted_default is not None:
+            source = "persisted_default"
+            result = self._persisted_default  # already validated in constructor
         else:
-            source, value = ("fallback", self._value_fallback)
-        # make sure the hash mode is valid
-        self._validate_value(value=value, source=source)
-        # done
-        return value
-
-
-# ========================================================================= #
-# String Variable Manager                                                   #
-# ========================================================================= #
-
-
-class EnvVarHandlerStr(EnvVarHandlerBase[str]):
-    def __init__(
-        self,
-        environ_key: str,
-        fallback_value: str,
-        *,
-        allowed_values: Optional[Sequence[str]] = None,
-        identifier: Optional[str] = None,
-    ):
-        # values
-        self._allowed_values = set(allowed_values)
-        # checks
-        if len(self.allowed_values) <= 0:
-            raise ValueError(
-                f"allowed_values must not be an empty sequence, got: {repr(self._allowed_values)}"
+            raise EnvVarMissingError(f"error getting {repr(self._key)} from any source")
+        # handle missing values
+        if result is None:
+            raise EnvVarMissingError(
+                f"error getting {repr(self._key)} from {repr(source)}"
             )
-        if not all(isinstance(v, str) for v in self._allowed_values):
-            raise ValueError(
-                f"all entries in the allowed_values must be strings, got: {repr(self._allowed_values)}"
-            )
-        if fallback_value not in self._allowed_values:
-            raise ValueError(
-                f"the fallback_value: {repr(fallback_value)} is not one of the allowed_values: {repr(self._allowed_values)}"
-            )
-        # initialize
-        super().__init__(
-            environ_key=environ_key,
-            fallback_value=fallback_value,
-            identifier=identifier,
-        )
-
-    # CUSTOM
-
-    @property
-    def allowed_values(self) -> Optional[List[str]]:
-        if self._allowed_values is None:
-            return None
-        return sorted(self._allowed_values)
-
-    # OVERRIDDEN
-
-    def _validate_value(self, value: str, source: Optional[str] = None) -> None:
-        if not isinstance(value, str):
+        # validate the result
+        try:
+            return self._val_validator(result)
+        except Exception as e:
             raise EnvVarValidationError(
-                f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {str}, got type: {type(value)}"
-            )
-        if self._allowed_values is not None:
-            if value not in self._allowed_values:
+                f"error getting {repr(self._key)} from {repr(source)}, validation failed: {e}"
+            ) from e
+
+    # ===== static helpers ===== #
+
+    @classmethod
+    def as_converter(cls, fn: EnvVarFnConverterHint[T]) -> EnvVarFnConverterHint[T]:
+        def _converter(value: str) -> T:
+            try:
+                return fn(value)
+            except Exception as e:
+                raise EnvVarConversionError(f"error converting {value} to {fn}: {e}")
+
+        return _converter
+
+    @classmethod
+    def as_validator(cls, fn: EnvVarFnValidatorHint[T]) -> EnvVarFnValidatorHint[T]:
+        def _validator(value: T) -> T:
+            try:
+                return fn(value)
+            except Exception as e:
                 raise EnvVarValidationError(
-                    f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be one of the allowed_values: {self.allowed_values}"
+                    f"error validating {repr(value)} with {fn}: {e}"
                 )
 
-    def _normalize_environ_value(self, value: str) -> str:
-        return value
+        return _validator
 
+    @classmethod
+    def validator_sequence(
+        cls,
+        *fns: EnvVarFnValidatorHint[T],
+    ) -> EnvVarFnValidatorHint[T]:
+        def _validator(value: T) -> T:
+            for fn in fns:
+                if fn is not None:
+                    value = fn(value)
+            return value
 
-# ========================================================================= #
-# Bool Variable Manager                                                     #
-# ========================================================================= #
+        return _validator
 
+    @classmethod
+    def validator_allowed(cls, allowed_values: Iterable[T]) -> EnvVarFnValidatorHint[T]:
+        allowed_values = set(allowed_values)
+        if not allowed_values:
+            raise ValueError("allowed_values must not be empty")
 
-class EnvVarHandlerBool(EnvVarHandlerBase[bool]):
-    def __init__(
-        self,
-        environ_key: str,
-        fallback_value: bool,
+        def _validator(value: T) -> T:
+            if value not in allowed_values:
+                raise EnvVarValidationError(
+                    f"value {repr(value)} must be one of: {allowed_values}"
+                )
+            return value
+
+        return _validator
+
+    # ===== factory methods ===== #
+
+    @classmethod
+    def env_str(
+        cls,
+        key: str,
         *,
-        environ_keys_true: Sequence[str] = ("y", "yes", "t", "true", "1"),
-        environ_keys_false: Sequence[str] = ("n", "no", "f", "false", "0"),
-        environ_to_lower_case: bool = True,
-        identifier: Optional[str] = None,
-    ):
-        # values
-        self._environ_keys_true = set(environ_keys_true)
-        self._environ_keys_false = set(environ_keys_false)
-        self._environ_to_lower_case = environ_to_lower_case
-        # checks
-        assert self._environ_keys_true and all(
-            isinstance(v, str) for v in self._environ_keys_true
-        )
-        assert self._environ_keys_false and all(
-            isinstance(v, str) for v in self._environ_keys_false
-        )
-        assert isinstance(environ_to_lower_case, bool)
-        # init
-        super().__init__(
-            environ_key=environ_key,
-            fallback_value=fallback_value,
-            identifier=identifier,
+        default: Optional[str] = None,
+        validator: Optional[EnvVarFnValidatorHint[str]] = None,
+    ) -> "EnvVar[str]":
+        return cls(
+            key=key,
+            default=default,
+            converter=cls.as_converter(str),
+            validator=validator,
         )
 
-    def _validate_value(self, value: bool, source: str) -> None:
-        if not isinstance(value, bool):
-            raise EnvVarValidationError(
-                f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {bool}, got type: {type(value)}"
-            )
-
-    def _normalize_environ_value(self, value: str) -> bool:
-        if self._environ_to_lower_case:
-            value = value.lower()
-        if value in self._environ_keys_true:
-            return True
-        elif value in self._environ_keys_false:
-            return False
-        else:
-            raise EnvVarConversionError(
-                f"cannot normalize environment variable `{self.environ_key}={repr(value)}` into {self.identifier}, must be one of: {sorted(self._environ_keys_true | self._environ_keys_false)}"
-            )
-
-
-# ========================================================================= #
-# Int Variable Manager                                                      #
-# ========================================================================= #
-
-
-class EnvVarHandlerInt(EnvVarHandlerBase[int]):
-    def __init__(
-        self,
-        environ_key: str,
-        fallback_value: int,
+    @classmethod
+    def env_int(
+        cls,
+        key: str,
         *,
-        identifier: Optional[str] = None,
-    ):
-        super().__init__(
-            environ_key=environ_key,
-            fallback_value=fallback_value,
-            identifier=identifier,
+        default: Optional[int] = None,
+        validator: Optional[EnvVarFnValidatorHint[int]] = None,
+    ) -> "EnvVar[int]":
+        return cls(
+            key=key,
+            default=default,
+            converter=cls.as_converter(int),
+            validator=validator,
         )
 
-    def _validate_value(self, value: int, source: str) -> None:
-        if not isinstance(value, int):
-            raise EnvVarValidationError(
-                f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {int}, got type: {type(value)}"
-            )
+    @classmethod
+    def env_float(
+        cls,
+        key: str,
+        *,
+        default: Optional[float] = None,
+        validator: Optional[EnvVarFnValidatorHint[float]] = None,
+    ) -> "EnvVar[float]":
+        return cls(
+            key=key,
+            default=default,
+            converter=cls.as_converter(float),
+            validator=validator,
+        )
 
-    def _normalize_environ_value(self, value: str) -> int:
-        try:
-            return int(value)
-        except ValueError:
-            raise EnvVarConversionError(
-                f"cannot normalize environment variable `{self.environ_key}={repr(value)}` into {self.identifier}, must be an integer"
-            )
+    @classmethod
+    def env_bool(
+        cls,
+        key: str,
+        *,
+        default: Optional[bool] = None,
+        # extra settings
+        convert_keys_true: Sequence[str] = ("y", "yes", "t", "true", "1"),
+        convert_keys_false: Sequence[str] = ("n", "no", "f", "false", "0"),
+        convert_lowercase: bool = True,
+        # not really useful for bool, but keep for consistency
+        validator: Optional[EnvVarFnValidatorHint[bool]] = None,
+    ) -> "EnvVar[bool]":
+        def convert_bool(value: str) -> bool:
+            if convert_lowercase:
+                value = value.lower()
+            if value in convert_keys_true:
+                return True
+            elif value in convert_keys_false:
+                return False
+            else:
+                raise EnvVarConversionError(
+                    f"cannot convert environment variable `{key}={value}` into bool, must be one of: {sorted(list(convert_keys_true) + list(convert_keys_false))}"
+                )
+
+        return cls(
+            key=key,
+            default=default,
+            converter=convert_bool,
+            validator=validator,
+        )
 
 
 # ========================================================================= #

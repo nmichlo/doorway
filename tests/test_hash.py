@@ -34,10 +34,8 @@ import pytest
 
 import doorway._hash
 from doorway._hash import hash_mode_get
-from doorway._hash import hash_mode_set_default
 from doorway._hash import hash_algo_get
-from doorway._hash import hash_algo_set_default
-from doorway._env_vars import EnvVarHandlerStr
+from doorway._env_vars import EnvVar, EnvVarMissingError, EnvVarValidationError
 from doorway._ctx import ctx_temp_attr
 from doorway._ctx import ctx_temp_environ
 
@@ -48,47 +46,20 @@ from doorway._ctx import ctx_temp_environ
 
 
 @contextmanager
-def context_temp_hash_mode_fallback(hash_mode: Optional[str]):
-    with (
-        nullcontext()
-        if (not hash_mode)
-        else ctx_temp_attr(
-            doorway._hash._VAR_HANDLER_HASH_MODE, "_value_fallback", hash_mode
-        )
-    ):
+def skip_context(value, ctx):
+    if value is not None:
+        with ctx:
+            yield
+    else:
         yield
 
 
-@contextmanager
-def context_temp_hash_mode_environ(hash_mode: Optional[str]):
-    with (
-        nullcontext()
-        if (not hash_mode)
-        else ctx_temp_environ(DOORWAY_HASH_MODE=hash_mode)
-    ):
-        yield
-
-
-@contextmanager
-def context_temp_hash_algo_environ(hash_algo: Optional[str]):
-    with (
-        nullcontext()
-        if (not hash_algo)
-        else ctx_temp_environ(DOORWAY_HASH_ALGO=hash_algo)
-    ):
-        yield
-
-
-@contextmanager
-def context_temp_hash_mode_default(hash_mode: Optional[str]):
-    with (
-        nullcontext()
-        if (not hash_mode)
-        else ctx_temp_attr(
-            doorway._hash._VAR_HANDLER_HASH_MODE, "_value_default", hash_mode
-        )
-    ):
-        yield
+def context_temp_hash_mode_default(
+    hash_mode: Optional[str], target=doorway._hash._VAR_HANDLER_HASH_MODE
+):
+    return skip_context(
+        hash_mode, ctx_temp_attr(target, "_persisted_default", hash_mode)
+    )
 
 
 # ========================================================================= #
@@ -96,98 +67,70 @@ def context_temp_hash_mode_default(hash_mode: Optional[str]):
 # ========================================================================= #
 
 
-INVALID = "INVL"
-
-
-def _get_params():
-    params = itertools.product(
-        ["full", "fast", INVALID, None],
-        ["full", "fast", INVALID, None],
-        ["full", "fast", INVALID, None],
-        ["full", "fast", INVALID],
-    )
-    for row in params:
-        row = list(row)
-        target, source = next(
-            (t, s)
-            for t, s in zip(row, ["manual", "default", "environment", "fallback"])
-            if t
-        )
-        yield *reversed(row), target, source
+INVALID = "<INVALID>"
 
 
 @pytest.mark.parametrize(
-    ("fallback", "environ", "default", "manual", "target", "source"),
-    _get_params(),
+    ("usr_override", "cls_override", "environ", "usr_default", "cls_default"),
+    itertools.product(
+        ["a", INVALID, None],  # usr_override
+        ["b", INVALID, None],  # cls_override
+        ["c", INVALID, None],  # environ
+        ["d", INVALID, None],  # usr_default
+        ["e", INVALID, None],  # cls_default
+    ),
 )
 def test_get_hash_mode(
-    fallback: str, environ: str, default: str, manual: str, target: str, source: str
+    usr_override: str,
+    cls_override: str,
+    environ: str,
+    usr_default: str,
+    cls_default: str,
 ):
-    # check initial
-    assert hash_mode_get() == "fast"
     # forcefully set the fallback, environ, and defaults
-    with context_temp_hash_mode_fallback(fallback):
-        with context_temp_hash_mode_environ(environ):
-            with context_temp_hash_mode_default(default):
-                # handle the different cases
-                if target != INVALID:
-                    assert hash_mode_get(manual) == target
-                    assert hash_mode_get("full") == "full"
-                    assert hash_mode_get("fast") == "fast"
-                    with pytest.raises(
-                        KeyError,
-                        match=f"invalid hash_mode: '{INVALID}', obtained from source: manual",
-                    ):
-                        hash_mode_get(INVALID)
-                    assert hash_mode_get(manual) == target
-                else:
-                    with pytest.raises(
-                        KeyError,
-                        match=f"invalid hash_mode: '{INVALID}', obtained from source: {source}",
-                    ):
-                        hash_mode_get(INVALID if (source == "manual") else None)
-    # check restored
-    assert hash_mode_get() == "fast"
+    with skip_context(environ, ctx_temp_environ(ASDF_FDSA=environ)):
+        env_var = EnvVar.env_str(
+            key="ASDF_FDSA",
+            validator=EnvVar.validator_allowed(["a", "b", "c", "d", "e"]),
+        )
+        env_var.set_default_value(cls_default)
+        env_var.set_override_value(cls_override)
+        # now get
+        values = [usr_override, cls_override, environ, usr_default, cls_default]
+        first = next((v for v in values if v is not None), None)
+
+        if first is None:
+            with pytest.raises(EnvVarMissingError):
+                env_var.get(default=usr_default, override=usr_override)
+        elif first == INVALID:
+            with pytest.raises(EnvVarValidationError):
+                env_var.get(default=usr_default, override=usr_override)
+        else:
+            assert env_var.get(default=usr_default, override=usr_override) == first
 
 
 def test_hash_mode_set_default():
     assert hash_mode_get() == "fast"
-    hash_mode_set_default("full")
-    assert hash_mode_get() == "full"
-    hash_mode_set_default("fast")
-    assert hash_mode_get() == "fast"
     # check that environ doesnt overwrite & that setting to null resets
-    with context_temp_hash_mode_environ("full"):
-        assert hash_mode_get() == "fast"
-        hash_mode_set_default(None)
+    with ctx_temp_environ(DOORWAY_HASH_MODE="full"):
         assert hash_mode_get() == "full"
     assert hash_mode_get() == "fast"
     # check invalid
-    with pytest.raises(
-        KeyError,
-        match="invalid hash_mode: 'INVALID', obtained from source: set_default_value, must be one of the allowed_values: \\['fast', 'full'\\]",
-    ):
-        hash_mode_set_default("INVALID")
+    with ctx_temp_environ(DOORWAY_HASH_MODE="INVALID"):
+        with pytest.raises(EnvVarValidationError):
+            hash_mode_get()
 
 
 def test_hash_algo_set_default():
     assert hash_algo_get() == "md5"
-    hash_algo_set_default("sha1")
-    assert hash_algo_get() == "sha1"
-    hash_algo_set_default("md5")
-    assert hash_algo_get() == "md5"
     # check that environ doesnt overwrite & that setting to null resets
-    with context_temp_hash_algo_environ("sha1"):
-        assert hash_algo_get() == "md5"
-        hash_algo_set_default(None)
+    with ctx_temp_environ(DOORWAY_HASH_ALGO="sha1"):
         assert hash_algo_get() == "sha1"
     assert hash_algo_get() == "md5"
     # check invalid
-    with pytest.raises(
-        KeyError,
-        match="invalid hash_algo: 'INVALID', obtained from source: set_default_value, must be one of the allowed_values:",
-    ):
-        hash_algo_set_default("INVALID")
+    with ctx_temp_environ(DOORWAY_HASH_ALGO="INVALID"):
+        with pytest.raises(EnvVarValidationError):
+            hash_algo_get()
 
 
 def test_hash_norm():
@@ -563,29 +506,27 @@ def test_hash_file_validate():
 
 
 def test_variable_handler():
-    handler = EnvVarHandlerStr(
-        identifier="var_handler",
-        environ_key="VAR_HANDLER",
-        fallback_value="1",
-        allowed_values=("2", "1", "3"),
+    handler = EnvVar.env_str(
+        key="VAR_HANDLER",
+        default="1",
+        validator=EnvVar.validator_allowed(["1", "2", "3"]),
     )
-    assert handler.environ_key == "VAR_HANDLER"
-    assert handler.fallback_value == "1"
-    assert handler.allowed_values == ["1", "2", "3"]
+    assert handler.env_key == "VAR_HANDLER"
     # environ values
-    assert handler.get_value() == "1"
+    assert handler.get() == "1"
     with ctx_temp_environ(VAR_HANDLER="3"):
-        assert handler.get_value() == "3"
-    assert handler.get_value() == "1"
+        assert handler.get() == "3"
+    assert handler.get() == "1"
+
     # checks
     handler.set_default_value("2")
-    assert handler.get_value() == "2"
-    handler.set_default_value(None)
-    assert handler.get_value() == "1"
+    assert handler.get() == "2"
     handler.set_default_value("2")
-    assert handler.get_value() == "2"
-    handler.del_default_value()
-    assert handler.get_value() == "1"
+    assert handler.get() == "2"
+
+    handler.set_default_value(None)
+    with pytest.raises(EnvVarMissingError):
+        handler.get()
 
 
 # ========================================================================= #

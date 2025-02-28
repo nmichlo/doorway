@@ -35,16 +35,13 @@ __all__ = [
     "ctx_temp_sys_args",
     "ctx_temp_environ",
     # ===== env_vars ===== #
-    "EnvVarHandlerBase",
-    "EnvVarHandlerStr",
-    "EnvVarHandlerBool",
-    "EnvVarHandlerInt",
+    "EnvVar",
     # errors
     "EnvVarError",
+    "EnvVarMissingError",
     "EnvVarValidationError",
     "EnvVarConversionError",
     # ===== fmt ===== #
-    "fmt_use_colors_set_default",
     "fmt_use_colors_get",
     "fmt_bytes_to_human",
     # ===== hash ===== #
@@ -57,9 +54,7 @@ __all__ = [
     # errors
     "HashError",
     # hash mode
-    "hash_mode_set_default",
     "hash_mode_get",
-    "hash_algo_set_default",
     "hash_algo_get",
     # normalise hash
     "hash_norm",
@@ -105,16 +100,13 @@ from doorway._ctx import (
     ctx_temp_environ,
 )
 from doorway._env_vars import (
-    EnvVarHandlerBase,
-    EnvVarHandlerStr,
-    EnvVarHandlerBool,
-    EnvVarHandlerInt,
+    EnvVar,
     EnvVarError,
     EnvVarValidationError,
+    EnvVarMissingError,
     EnvVarConversionError,
 )
 from doorway._fmt import (
-    fmt_use_colors_set_default,
     fmt_use_colors_get,
     fmt_bytes_to_human,
 )
@@ -125,9 +117,7 @@ from doorway._hash import (
     HashAlgo,
     HashPath,
     HashError,
-    hash_mode_set_default,
     hash_mode_get,
-    hash_algo_set_default,
     hash_algo_get,
     hash_norm,
     hash_bytes,
