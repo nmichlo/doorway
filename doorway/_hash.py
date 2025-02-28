@@ -125,8 +125,9 @@ def hash_mode_get(hash_mode: Optional[HashMode] = None) -> HashMode:
 _VAR_HANDLER_HASH_ALGO = EnvVar.env_str(
     key="DOORWAY_HASH_ALGO",
     default="md5",
-    validator=EnvVar.validator_allowed(hashlib.algorithms_guaranteed),
-    # hashlib.algorithms_available?
+    validator=EnvVar.validator_allowed(
+        hashlib.algorithms_guaranteed | hashlib.algorithms_available
+    ),
 )
 
 
