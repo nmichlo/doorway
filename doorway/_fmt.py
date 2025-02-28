@@ -24,7 +24,6 @@
 
 
 __all__ = [
-    "fmt_use_colors_set_default",
     "fmt_use_colors_get",
     "fmt_bytes_to_human",
 ]
@@ -34,7 +33,7 @@ import math
 from typing import Optional
 
 import doorway._colors as c
-from doorway._env_vars import EnvVarHandlerBool
+from doorway._env_vars import EnvVar
 
 
 # ========================================================================= #
@@ -42,19 +41,14 @@ from doorway._env_vars import EnvVarHandlerBool
 # ========================================================================= #
 
 
-_VAR_HANDLER_USE_COLORS = EnvVarHandlerBool(
-    identifier="colors",
-    environ_key="DOORWAY_ENABLE_COLORS",
-    fallback_value=True,
+_VAR_HANDLER_USE_COLORS = EnvVar.env_bool(
+    key="DOORWAY_ENABLE_COLORS",
+    default=True,
 )
 
 
-def fmt_use_colors_set_default(use_colors: Optional[bool]) -> None:
-    return _VAR_HANDLER_USE_COLORS.set_default_value(value=use_colors)
-
-
 def fmt_use_colors_get(use_colors: Optional[bool] = None) -> bool:
-    return _VAR_HANDLER_USE_COLORS.get_value(override=use_colors)
+    return _VAR_HANDLER_USE_COLORS.get(override=use_colors)
 
 
 # ========================================================================= #
