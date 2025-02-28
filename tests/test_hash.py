@@ -128,7 +128,7 @@ def test_hash_mode_set_default():
         assert hash_mode_get() == 'full'
     assert hash_mode_get() == 'fast'
     # check invalid
-    with pytest.raises(KeyError, match="invalid hash_mode: \'INVALID\', obtained from source: set_default_value, must be one of the allowed_values: \['fast', 'full'\]"):
+    with pytest.raises(KeyError, match="invalid hash_mode: 'INVALID', obtained from source: set_default_value, must be one of the allowed_values: \\['fast', 'full'\\]"):
         hash_mode_set_default('INVALID')
 
 
@@ -158,31 +158,31 @@ def test_hash_norm():
     assert doorway.hash_norm({                        'fast': 'fast', 'md5': 'md5'}) == 'fast'
     assert doorway.hash_norm({                        'fast': 'fast'              }) == 'fast'
     assert doorway.hash_norm({                                        'md5': 'md5'}) == 'md5'
-    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'fast:md5', 2. 'fast', or 3. 'md5'. Available hash keys are: \[\]"):
+    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'fast:md5', 2. 'fast', or 3. 'md5'. Available hash keys are: \\[\\]"):
         assert doorway.hash_norm({})
     # check overrides 1.
     assert doorway.hash_norm({'fast:md5': 'fast:md5'}, hash_mode=None, hash_algo=None) == 'fast:md5'
     assert doorway.hash_norm({'fast':     'fast'},     hash_mode=None, hash_algo=None) == 'fast'
     assert doorway.hash_norm({'md5':      'md5'},      hash_mode=None, hash_algo=None) == 'md5'
-    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'fast:md5', 2. 'fast', or 3. 'md5'. Available hash keys are: \['invalid'\]"):
+    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'fast:md5', 2. 'fast', or 3. 'md5'. Available hash keys are: \\['invalid'\\]"):
         doorway.hash_norm({'invalid': 'invalid'},              hash_mode=None, hash_algo=None)
     # check overrides 2.
     assert doorway.hash_norm({'full:md5': 'full:md5'}, hash_mode='full', hash_algo=None) == 'full:md5'
     assert doorway.hash_norm({'full':     'full'},     hash_mode='full', hash_algo=None) == 'full'
     assert doorway.hash_norm({'md5':      'md5'},      hash_mode='full', hash_algo=None) == 'md5'
-    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'full:md5', 2. 'full', or 3. 'md5'. Available hash keys are: \['invalid'\]"):
+    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'full:md5', 2. 'full', or 3. 'md5'. Available hash keys are: \\['invalid'\\]"):
         doorway.hash_norm({'invalid': 'invalid'},              hash_mode='full', hash_algo=None)
     # check overrides 3.
     assert doorway.hash_norm({'fast:sha1': 'fast:sha1'}, hash_mode=None, hash_algo='sha1') == 'fast:sha1'
     assert doorway.hash_norm({'fast':      'fast'},      hash_mode=None, hash_algo='sha1') == 'fast'
     assert doorway.hash_norm({'sha1':      'sha1'},      hash_mode=None, hash_algo='sha1') == 'sha1'
-    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'fast:sha1', 2. 'fast', or 3. 'sha1'. Available hash keys are: \['invalid'\]"):
+    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'fast:sha1', 2. 'fast', or 3. 'sha1'. Available hash keys are: \\['invalid'\\]"):
         doorway.hash_norm({'invalid': 'invalid'},                hash_mode=None, hash_algo='sha1')
     # check overrides 4.
     assert doorway.hash_norm({'full:sha1': 'full:sha1'}, hash_mode='full', hash_algo='sha1') == 'full:sha1'
     assert doorway.hash_norm({'full':      'full'},      hash_mode='full', hash_algo='sha1') == 'full'
     assert doorway.hash_norm({'sha1':      'sha1'},      hash_mode='full', hash_algo='sha1') == 'sha1'
-    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'full:sha1', 2. 'full', or 3. 'sha1'. Available hash keys are: \['invalid'\]"):
+    with pytest.raises(KeyError, match="hash dictionary does not contain a valid key for either 1. 'full:sha1', 2. 'full', or 3. 'sha1'. Available hash keys are: \\['invalid'\\]"):
         doorway.hash_norm({'invalid': 'invalid'},                hash_mode='full', hash_algo='sha1')
 
 
