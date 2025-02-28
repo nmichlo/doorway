@@ -75,7 +75,7 @@ def io_download(
         LOG.info(f"Downloading: {src_url} to: {dst_path}")
         with tqdm(
             total=total_length,
-            desc=f"Downloading",
+            desc="Downloading",
             unit="B",
             unit_scale=True,
             unit_divisor=1024,

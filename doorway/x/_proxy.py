@@ -171,7 +171,7 @@ def _scrape_proxies_morph(proxy_type) -> List[Dict[str, str]]:
     morph_api_url = "https://api.morph.io/CookieMichal/us-proxy/data.json"
 
     query = (
-        f"select * from 'data' where (anonymity='elite proxy' or anonymity='anonymous')"
+        "select * from 'data' where (anonymity='elite proxy' or anonymity='anonymous')"
     )
 
     if "https" == proxy_type:
