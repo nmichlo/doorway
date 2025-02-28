@@ -22,12 +22,40 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+__all__ = (
+    "EnvVarHandlerBase",
+    "EnvVarHandlerStr",
+    "EnvVarHandlerBool",
+    "EnvVarHandlerInt",
+    # errors
+    "EnvVarError",
+    "EnvVarValidationError",
+    "EnvVarConversionError",
+)
+
+import abc
 import os
-from typing import NoReturn
-from typing import Optional
+from typing import List, Optional
 from typing import Sequence
 from typing import Generic
 from typing import TypeVar
+
+
+# ========================================================================= #
+# Errors                                                                    #
+# ========================================================================= #
+
+
+class EnvVarError(ValueError):
+    pass
+
+
+class EnvVarValidationError(EnvVarError):
+    pass
+
+
+class EnvVarConversionError(EnvVarError):
+    pass
 
 
 # ========================================================================= #
@@ -38,13 +66,20 @@ from typing import TypeVar
 T = TypeVar("T")
 
 
-class VarHandlerBase(Generic[T]):
+class EnvVarHandlerBase(Generic[T], abc.ABC):
+    """
+    Base class for managing variables that can be set via environment variables.
+    """
+
     def __init__(
         self,
-        identifier: str,
         environ_key: str,
         fallback_value: T,
+        *,
+        identifier: Optional[str] = None,
     ):
+        if identifier is None:
+            identifier = environ_key.lower()
         self._identifier = identifier
         self._environ_key = environ_key
         assert str.isidentifier(self._environ_key)
@@ -57,10 +92,12 @@ class VarHandlerBase(Generic[T]):
 
     # OVERRIDEABLE
 
-    def _validate_value(self, value: T, source: str) -> NoReturn:  # pragma: no cover
+    @abc.abstractmethod
+    def _validate_value(self, value: T, source: str) -> None:
         raise NotImplementedError
 
-    def _normalize_environ_value(self, value: str) -> T:  # pragma: no cover
+    @abc.abstractmethod
+    def _normalize_environ_value(self, value: str) -> T:
         raise NotImplementedError
 
     # COMMON - PROPS
@@ -79,14 +116,14 @@ class VarHandlerBase(Generic[T]):
 
     # COMMON - FUNCS
 
-    def set_default_value(self, value: Optional[T] = None) -> NoReturn:
+    def set_default_value(self, value: Optional[T] = None) -> None:
         # make sure the hash_algo is valid
         if value is not None:
             self._validate_value(value, source="set_default_value")
         # update the default mode
         self._value_default = value
 
-    def del_default_value(self) -> NoReturn:
+    def del_default_value(self) -> None:
         self._value_default = None
 
     def get_value(self, override: Optional[T] = None) -> T:
@@ -119,14 +156,14 @@ class VarHandlerBase(Generic[T]):
 # ========================================================================= #
 
 
-# TODO: add handlers for different types, eg. bool
-class VarHandlerStr(VarHandlerBase[str]):
+class EnvVarHandlerStr(EnvVarHandlerBase[str]):
     def __init__(
         self,
-        identifier: str,
         environ_key: str,
         fallback_value: str,
-        allowed_values: Sequence[str],
+        *,
+        allowed_values: Optional[Sequence[str]] = None,
+        identifier: Optional[str] = None,
     ):
         # values
         self._allowed_values = set(allowed_values)
@@ -145,28 +182,31 @@ class VarHandlerStr(VarHandlerBase[str]):
             )
         # initialize
         super().__init__(
-            identifier=identifier,
             environ_key=environ_key,
             fallback_value=fallback_value,
+            identifier=identifier,
         )
 
     # CUSTOM
 
     @property
-    def allowed_values(self) -> list:
+    def allowed_values(self) -> Optional[List[str]]:
+        if self._allowed_values is None:
+            return None
         return sorted(self._allowed_values)
 
     # OVERRIDDEN
 
-    def _validate_value(self, value: str, source: Optional[str] = None) -> NoReturn:
+    def _validate_value(self, value: str, source: Optional[str] = None) -> None:
         if not isinstance(value, str):
-            raise TypeError(
+            raise EnvVarValidationError(
                 f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {str}, got type: {type(value)}"
             )
-        if value not in self._allowed_values:
-            raise KeyError(
-                f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be one of the allowed_values: {self.allowed_values}"
-            )
+        if self._allowed_values is not None:
+            if value not in self._allowed_values:
+                raise EnvVarValidationError(
+                    f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be one of the allowed_values: {self.allowed_values}"
+                )
 
     def _normalize_environ_value(self, value: str) -> str:
         return value
@@ -177,15 +217,16 @@ class VarHandlerStr(VarHandlerBase[str]):
 # ========================================================================= #
 
 
-class VarHandlerBool(VarHandlerBase[bool]):
+class EnvVarHandlerBool(EnvVarHandlerBase[bool]):
     def __init__(
         self,
-        identifier: str,
         environ_key: str,
         fallback_value: bool,
+        *,
         environ_keys_true: Sequence[str] = ("y", "yes", "t", "true", "1"),
         environ_keys_false: Sequence[str] = ("n", "no", "f", "false", "0"),
         environ_to_lower_case: bool = True,
+        identifier: Optional[str] = None,
     ):
         # values
         self._environ_keys_true = set(environ_keys_true)
@@ -201,14 +242,14 @@ class VarHandlerBool(VarHandlerBase[bool]):
         assert isinstance(environ_to_lower_case, bool)
         # init
         super().__init__(
-            identifier=identifier,
             environ_key=environ_key,
             fallback_value=fallback_value,
+            identifier=identifier,
         )
 
-    def _validate_value(self, value: bool, source: str) -> NoReturn:
+    def _validate_value(self, value: bool, source: str) -> None:
         if not isinstance(value, bool):
-            raise TypeError(
+            raise EnvVarValidationError(
                 f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {bool}, got type: {type(value)}"
             )
 
@@ -220,21 +261,43 @@ class VarHandlerBool(VarHandlerBase[bool]):
         elif value in self._environ_keys_false:
             return False
         else:
-            raise TypeError(
+            raise EnvVarConversionError(
                 f"cannot normalize environment variable `{self.environ_key}={repr(value)}` into {self.identifier}, must be one of: {sorted(self._environ_keys_true | self._environ_keys_false)}"
             )
 
 
 # ========================================================================= #
-# export                                                                    #
+# Int Variable Manager                                                      #
 # ========================================================================= #
 
 
-__all__ = (
-    "VarHandlerBase",
-    "VarHandlerStr",
-    "VarHandlerBool",
-)
+class EnvVarHandlerInt(EnvVarHandlerBase[int]):
+    def __init__(
+        self,
+        environ_key: str,
+        fallback_value: int,
+        *,
+        identifier: Optional[str] = None,
+    ):
+        super().__init__(
+            environ_key=environ_key,
+            fallback_value=fallback_value,
+            identifier=identifier,
+        )
+
+    def _validate_value(self, value: int, source: str) -> None:
+        if not isinstance(value, int):
+            raise EnvVarValidationError(
+                f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {int}, got type: {type(value)}"
+            )
+
+    def _normalize_environ_value(self, value: str) -> int:
+        try:
+            return int(value)
+        except ValueError:
+            raise EnvVarConversionError(
+                f"cannot normalize environment variable `{self.environ_key}={repr(value)}` into {self.identifier}, must be an integer"
+            )
 
 
 # ========================================================================= #

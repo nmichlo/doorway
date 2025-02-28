@@ -22,16 +22,40 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+__all__ = [
+    # types
+    "Hash",
+    "Hashes",
+    "HashMode",
+    "HashAlgo",
+    "HashPath",
+    # errors
+    "HashError",
+    # hash mode
+    "hash_mode_set_default",
+    "hash_mode_get",
+    "hash_algo_set_default",
+    "hash_algo_get",
+    # normalise hash
+    "hash_norm",
+    # compute hash
+    "hash_bytes",
+    "hash_bytes_iter",
+    "hash_str",
+    "hash_file",
+    "hash_file_validate",
+    "hash_file_is_valid",
+]
+
 import hashlib
 import os
 import warnings
 from pathlib import Path
 from typing import Dict
 from typing import Iterable
-from typing import NoReturn
 from typing import Optional
 from typing import Union
-from doorway._utils import VarHandlerStr
+from doorway._env_vars import EnvVarHandlerStr
 
 
 # ========================================================================= #
@@ -89,7 +113,7 @@ _FILE_BYTE_PRODUCERS = {
 }
 
 
-_VAR_HANDLER_HASH_MODE = VarHandlerStr(
+_VAR_HANDLER_HASH_MODE = EnvVarHandlerStr(
     identifier="hash_mode",
     environ_key="DOORWAY_HASH_MODE",
     fallback_value="fast",
@@ -97,7 +121,7 @@ _VAR_HANDLER_HASH_MODE = VarHandlerStr(
 )
 
 
-def hash_mode_set_default(hash_mode: Optional[HashMode]) -> NoReturn:
+def hash_mode_set_default(hash_mode: Optional[HashMode]) -> None:
     return _VAR_HANDLER_HASH_MODE.set_default_value(value=hash_mode)
 
 
@@ -105,7 +129,7 @@ def hash_mode_get(hash_mode: Optional[HashMode] = None) -> HashMode:
     return _VAR_HANDLER_HASH_MODE.get_value(override=hash_mode)
 
 
-_VAR_HANDLER_HASH_ALGO = VarHandlerStr(
+_VAR_HANDLER_HASH_ALGO = EnvVarHandlerStr(
     identifier="hash_algo",
     environ_key="DOORWAY_HASH_ALGO",
     fallback_value="md5",
@@ -115,7 +139,7 @@ _VAR_HANDLER_HASH_ALGO = VarHandlerStr(
 )
 
 
-def hash_algo_set_default(hash_algo: Optional[HashAlgo]) -> NoReturn:
+def hash_algo_set_default(hash_algo: Optional[HashAlgo]) -> None:
     return _VAR_HANDLER_HASH_ALGO.set_default_value(value=hash_algo)
 
 
@@ -250,7 +274,7 @@ def hash_file_validate(
     hash_mode: Optional[HashMode] = None,
     hash_algo: Optional[HashAlgo] = None,
     hash_missing: bool = False,
-) -> NoReturn:
+) -> None:
     """
     :raises FileNotFoundError, HashError
     """
@@ -289,37 +313,6 @@ def hash_file_is_valid(
     except HashError:
         return False
     return True
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    # types
-    "Hash",
-    "Hashes",
-    "HashMode",
-    "HashAlgo",
-    "HashPath",
-    # errors
-    "HashError",
-    # hash mode
-    "hash_mode_set_default",
-    "hash_mode_get",
-    "hash_algo_set_default",
-    "hash_algo_get",
-    # normalise hash
-    "hash_norm",
-    # compute hash
-    "hash_bytes",
-    "hash_bytes_iter",
-    "hash_str",
-    "hash_file",
-    "hash_file_validate",
-    "hash_file_is_valid",
-)
 
 
 # ========================================================================= #

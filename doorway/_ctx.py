@@ -22,6 +22,17 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+
+__all__ = [
+    "ctx_no_stdout",
+    "ctx_no_stderr",
+    "ctx_temp_attr",
+    "ctx_temp_wd",
+    "ctx_temp_sys_args",
+    "ctx_temp_environ",
+]
+
+
 import os
 import sys
 import contextlib
@@ -129,21 +140,6 @@ def ctx_temp_environ(environment: Dict[str, Any] = None, **env_kwargs):
                 os.environ[k] = old_env[k]
             else:
                 del os.environ[k]
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    "ctx_no_stdout",
-    "ctx_no_stderr",
-    "ctx_temp_attr",
-    "ctx_temp_wd",
-    "ctx_temp_sys_args",
-    "ctx_temp_environ",
-)
 
 
 # ========================================================================= #

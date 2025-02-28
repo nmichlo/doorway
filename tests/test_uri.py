@@ -25,7 +25,7 @@
 import pytest
 
 from doorway.x._uri import UriMalformedException
-from doorway.x._uri import EnumUriType
+from doorway.x._uri import UriTypeEnum
 from doorway.x._uri import uri_parse
 from doorway.x._uri import uri_validate
 
@@ -36,33 +36,33 @@ from doorway.x._uri import uri_validate
 
 
 def test_uri_type_enum():
-    assert len(EnumUriType) == 4
-    assert list(EnumUriType) == [
-        EnumUriType.FILE,
-        EnumUriType.URL,
-        EnumUriType.S3,
-        EnumUriType.SSH,
+    assert len(UriTypeEnum) == 4
+    assert list(UriTypeEnum) == [
+        UriTypeEnum.FILE,
+        UriTypeEnum.URL,
+        UriTypeEnum.S3,
+        UriTypeEnum.SSH,
     ]
     # test types
-    assert isinstance(EnumUriType.FILE, EnumUriType)
-    assert isinstance(EnumUriType.FILE.value, str)
-    assert isinstance(EnumUriType.FILE.name, str)
+    assert isinstance(UriTypeEnum.FILE, UriTypeEnum)
+    assert isinstance(UriTypeEnum.FILE.value, str)
+    assert isinstance(UriTypeEnum.FILE.name, str)
     # make sure the inverse is not true
-    assert not isinstance(EnumUriType.FILE, str)
-    assert not isinstance(EnumUriType.FILE.value, EnumUriType)
-    assert not isinstance(EnumUriType.FILE.name, EnumUriType)
+    assert not isinstance(UriTypeEnum.FILE, str)
+    assert not isinstance(UriTypeEnum.FILE.value, UriTypeEnum)
+    assert not isinstance(UriTypeEnum.FILE.name, UriTypeEnum)
     # test equivalence
-    assert EnumUriType.FILE == EnumUriType.FILE
-    assert EnumUriType.FILE != EnumUriType.URL
-    assert EnumUriType.URL == EnumUriType.URL
+    assert UriTypeEnum.FILE == UriTypeEnum.FILE
+    assert UriTypeEnum.FILE != UriTypeEnum.URL
+    assert UriTypeEnum.URL == UriTypeEnum.URL
     # check enums are not equal to their values
-    assert EnumUriType.FILE != EnumUriType.FILE.value
-    assert EnumUriType.FILE != EnumUriType.FILE.name
-    assert EnumUriType.URL != EnumUriType.URL.value
-    assert EnumUriType.URL != EnumUriType.URL.name
+    assert UriTypeEnum.FILE != UriTypeEnum.FILE.value
+    assert UriTypeEnum.FILE != UriTypeEnum.FILE.name
+    assert UriTypeEnum.URL != UriTypeEnum.URL.value
+    assert UriTypeEnum.URL != UriTypeEnum.URL.name
     # check names and values are equivalent
-    assert EnumUriType.FILE.name == EnumUriType.FILE.value
-    assert EnumUriType.URL.name == EnumUriType.URL.value
+    assert UriTypeEnum.FILE.name == UriTypeEnum.FILE.value
+    assert UriTypeEnum.URL.name == UriTypeEnum.URL.value
 
 
 def test_filename_from_uri():

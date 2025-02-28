@@ -22,12 +22,19 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+
+__all__ = [
+    "fmt_use_colors_set_default",
+    "fmt_use_colors_get",
+    "fmt_bytes_to_human",
+]
+
+
 import math
-from typing import NoReturn
 from typing import Optional
 
 import doorway._colors as c
-from doorway._utils import VarHandlerBool
+from doorway._env_vars import EnvVarHandlerBool
 
 
 # ========================================================================= #
@@ -35,14 +42,14 @@ from doorway._utils import VarHandlerBool
 # ========================================================================= #
 
 
-_VAR_HANDLER_USE_COLORS = VarHandlerBool(
+_VAR_HANDLER_USE_COLORS = EnvVarHandlerBool(
     identifier="colors",
     environ_key="DOORWAY_ENABLE_COLORS",
     fallback_value=True,
 )
 
 
-def fmt_use_colors_set_default(use_colors: Optional[bool]) -> NoReturn:
+def fmt_use_colors_set_default(use_colors: Optional[bool]) -> None:
     return _VAR_HANDLER_USE_COLORS.set_default_value(value=use_colors)
 
 
@@ -150,18 +157,6 @@ def fmt_bytes_to_human(
         return f"{size_fmt:>{lpad + decimals}.{decimals}f} {unit:<{rpad}s}"
     else:
         return f"{size_fmt:.{decimals}f} {unit}"
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    "fmt_use_colors_set_default",
-    "fmt_use_colors_get",
-    "fmt_bytes_to_human",
-)
 
 
 # ========================================================================= #

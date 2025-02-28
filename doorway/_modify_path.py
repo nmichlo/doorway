@@ -22,6 +22,13 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+__all__ = [
+    "basename_split_ext",
+    "basename_modify",
+    "path_basename_modify",
+]
+
+
 from pathlib import Path
 from typing import Optional
 from typing import Tuple
@@ -118,18 +125,6 @@ def path_basename_modify(
     path = path.parent.joinpath(basename)
     # return path with same format as input
     return str(path) if isinstance(file, str) else path
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    "basename_split_ext",
-    "basename_modify",
-    "path_basename_modify",
-)
 
 
 # ========================================================================= #

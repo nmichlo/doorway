@@ -24,16 +24,20 @@
 
 __all__ = [
     # proxy scraper registration
-    "set_default_proxy_scraper",
-    "register_proxy_scraper",
-    "scrape_proxies",
+    "proxies_set_default_scraper",
+    "proxies_register_scraper",
+    "proxies_scrape",
     # errors
-    "MalformedProxyError",
-    "NoMoreProxiesError",
+    "ProxiesRunOutError",
+    "ProxyMalformedError",
     "ProxyDownloadFailedError",
-    # helpers
+    # hints
+    "ProxyRegisteredScraperHint",
+    "ProxyTypeHint",
     "ProxyDictHint",
-    "download_with_proxy",
+    "ProxyScrapeFnHint",
+    # helpers
+    "proxy_download",
     # main api
     "ProxyDownloader",
 ]
@@ -69,11 +73,12 @@ class HTTPSProxyHint(TypedDict):
     HTTPS: str
 
 
-RegisteredScraper = str
-ProxyType = Union["http", "https", "all"]
+ProxyRegisteredScraperHint = str
+ProxyTypeHint = Literal["http", "https", "all"]
 ProxyDictHint = Union[HTTPProxyHint, HTTPSProxyHint]
-ProxyScrapeFn = Callable[[ProxyType], List[ProxyDictHint]]
-_GenericScrapeFn = TypeVar("_GenericScrapeFn", bound=ProxyScrapeFn)
+ProxyScrapeFnHint = Callable[[ProxyTypeHint], List[ProxyDictHint]]
+
+_GenericScrapeFn = TypeVar("_GenericScrapeFn", bound=ProxyScrapeFnHint)
 
 
 # ============================================================================ #
@@ -85,7 +90,7 @@ _PROXY_SOURCES = {}
 _DEFAULT_SOURCE = None
 
 
-def set_default_proxy_scraper(name: RegisteredScraper) -> None:
+def proxies_set_default_scraper(name: ProxyRegisteredScraperHint) -> None:
     if name not in _PROXY_SOURCES:
         raise KeyError(
             f"Cannot set as default! Scrape function with name: {repr(name)} does not exist."
@@ -98,8 +103,8 @@ def set_default_proxy_scraper(name: RegisteredScraper) -> None:
         _DEFAULT_SOURCE = name
 
 
-def register_proxy_scraper(
-    name: RegisteredScraper,
+def proxies_register_scraper(
+    name: ProxyRegisteredScraperHint,
     *,
     is_default: bool = False,
     scrape_fn: Optional[_GenericScrapeFn] = None,
@@ -115,7 +120,7 @@ def register_proxy_scraper(
         _LOGGER.debug(f"registered proxy scrape_fn: {repr(name)}")
         # set the default
         if is_default:
-            set_default_proxy_scraper(name=name)
+            proxies_set_default_scraper(name=name)
         return scrape_fn
 
     # decorator or function
@@ -125,9 +130,9 @@ def register_proxy_scraper(
         return wrapper(scrape_fn)
 
 
-def scrape_proxies(
-    source: Optional[str] = RegisteredScraper,
-    proxy_type: ProxyType = "all",
+def proxies_scrape(
+    source: Optional[str] = ProxyRegisteredScraperHint,
+    proxy_type: ProxyTypeHint = "all",
     cache_dir: str = "data/proxies/cachier",
     cached: bool = True,
 ) -> List[ProxyDictHint]:
@@ -183,8 +188,8 @@ def _requests_get(
     )
 
 
-@register_proxy_scraper("proxylist.geonode.com", is_default=True)
-def _scrape_proxylist_geonode_com(proxy_type: ProxyType) -> List[ProxyDictHint]:
+@proxies_register_scraper("proxylist.geonode.com", is_default=True)
+def _scrape_proxylist_geonode_com(proxy_type: ProxyTypeHint) -> List[ProxyDictHint]:
     def _get_page(page):
         r = _requests_get(
             f"https://proxylist.geonode.com/api/proxy-list?limit=500&page={page}&sort_by=lastChecked&sort_type=desc",
@@ -219,8 +224,8 @@ def _scrape_proxylist_geonode_com(proxy_type: ProxyType) -> List[ProxyDictHint]:
     return proxies
 
 
-@register_proxy_scraper("morph.io")
-def _scrape_proxies_morph(proxy_type: ProxyType) -> List[ProxyDictHint]:
+@proxies_register_scraper("morph.io")
+def _scrape_proxies_morph(proxy_type: ProxyTypeHint) -> List[ProxyDictHint]:
     assert "MORPH_API_KEY" in os.environ, "MORPH_API_KEY environment variable not set!"
     morph_api_key = os.environ["MORPH_API_KEY"]
     morph_api_url = "https://api.morph.io/CookieMichal/us-proxy/data.json"
@@ -249,8 +254,8 @@ def _scrape_proxies_morph(proxy_type: ProxyType) -> List[ProxyDictHint]:
     return proxies
 
 
-@register_proxy_scraper("free-proxy-list.net")
-def _scrape_proxies_freeproxieslist(proxy_type: ProxyType) -> List[Dict[str, str]]:
+@proxies_register_scraper("free-proxy-list.net")
+def _scrape_proxies_freeproxieslist(proxy_type: ProxyTypeHint) -> List[Dict[str, str]]:
     def can_add(https):
         if proxy_type == "all":
             return True
@@ -299,14 +304,14 @@ def _scrape_proxies_freeproxieslist(proxy_type: ProxyType) -> List[Dict[str, str
 # ============================================================================ #
 
 
-class MalformedProxyError(Exception):
+class ProxyMalformedError(Exception):
     """
     raised if a proxy does not follow the correct format.
     eg. `proxy = {'<protocol>': '<protocol>://<url>'}`
     """
 
 
-class NoMoreProxiesError(Exception):
+class ProxiesRunOutError(Exception):
     """
     raise if the ProxyDownloader has run out of proxies!
     """
@@ -327,7 +332,7 @@ def _make_proxy_opener(proxy: ProxyDictHint):
     import urllib.request
 
     if len(proxy) != 1:
-        raise MalformedProxyError(
+        raise ProxyMalformedError(
             f"proxy dictionaries should only have one entry, the key is the protocol, and the value is the url... invalid: {proxy}"
         )
     # build connection
@@ -336,7 +341,7 @@ def _make_proxy_opener(proxy: ProxyDictHint):
     )
 
 
-def download_with_proxy(
+def proxy_download(
     url: str,
     file: Union[str, Path],
     proxy: ProxyDictHint,
@@ -411,7 +416,9 @@ def _skip_or_prepare_file(
 class ProxyDownloader:
     def __init__(
         self,
-        proxies: Optional[Union[Sequence[ProxyDictHint], RegisteredScraper]] = None,
+        proxies: Optional[
+            Union[Sequence[ProxyDictHint], ProxyRegisteredScraperHint]
+        ] = None,
         req_min_remove_count: int = 5,
         req_max_fail_ratio: float = 0.5,
     ):
@@ -420,9 +427,9 @@ class ProxyDownloader:
 
         # default proxy scraping
         if proxies is None:
-            proxies = scrape_proxies()
+            proxies = proxies_scrape()
         elif isinstance(proxies, str):
-            proxies = scrape_proxies(source=proxies)
+            proxies = proxies_scrape(source=proxies)
         # convert
         self._proxies = list(proxies)  # TODO: add support for raw proxy strings?
         # proxy statistics
@@ -435,7 +442,7 @@ class ProxyDownloader:
 
     def random_proxy(self) -> ProxyDictHint:
         if len(self._proxies) <= 0:
-            raise NoMoreProxiesError(
+            raise ProxiesRunOutError(
                 "The proxy downloader has run out of valid proxies."
             )
         # return a random proxy!
@@ -544,7 +551,7 @@ class ProxyDownloader:
         for i in range(attempts):
             proxy = self.random_proxy()
             try:
-                download_with_proxy(url, file, proxy=proxy, timeout=timeout)
+                proxy_download(url, file, proxy=proxy, timeout=timeout)
                 if verbose:
                     _LOGGER.info(f"[DOWNLOADED]: {file} | {url}")
                 self._update_proxy(proxy, success=True)
@@ -579,7 +586,7 @@ if __name__ == "__main__":
         # download the proxies
         logging.basicConfig(level=logging.DEBUG)
         ProxyDownloader(
-            proxies=scrape_proxies(
+            proxies=proxies_scrape(
                 source=args.proxy_source,
                 proxy_type=args.proxy_type,
                 cache_dir=args.cache_dir,

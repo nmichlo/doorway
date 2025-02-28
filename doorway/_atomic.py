@@ -22,6 +22,11 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+__all__ = (
+    "AtomicPath",
+    "AtomicOpen",
+)
+
 import logging
 import os
 import shutil
@@ -309,17 +314,6 @@ class AtomicOpen(object):
         # cleanup like usual if we are not in read-only mode
         if self._atomic_path is not None:
             self._atomic_path.__exit__(error_type, error, traceback)
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    "AtomicPath",
-    "AtomicOpen",
-)
 
 
 # ========================================================================= #

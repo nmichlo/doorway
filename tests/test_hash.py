@@ -37,7 +37,7 @@ from doorway._hash import hash_mode_get
 from doorway._hash import hash_mode_set_default
 from doorway._hash import hash_algo_get
 from doorway._hash import hash_algo_set_default
-from doorway._utils import VarHandlerStr
+from doorway._env_vars import EnvVarHandlerStr
 from doorway._ctx import ctx_temp_attr
 from doorway._ctx import ctx_temp_environ
 
@@ -563,7 +563,7 @@ def test_hash_file_validate():
 
 
 def test_variable_handler():
-    handler = VarHandlerStr(
+    handler = EnvVarHandlerStr(
         identifier="var_handler",
         environ_key="VAR_HANDLER",
         fallback_value="1",

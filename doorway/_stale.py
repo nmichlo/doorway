@@ -22,10 +22,16 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+__all__ = [
+    "stalefile_is_stale",
+    "stalefile_generate",
+    "stalefile_decorator",
+    "Stalefile",
+]
+
 import logging
 from functools import wraps
 from typing import Callable
-from typing import NoReturn
 from typing import Optional
 from typing import Union
 
@@ -79,7 +85,7 @@ def stalefile_is_stale(
 
 
 def stalefile_generate(
-    make_file_fn: Callable[[HashPath], NoReturn],
+    make_file_fn: Callable[[HashPath], None],
     path: HashPath,
     hash: Hashes,
     hash_mode: Optional[HashMode] = None,
@@ -117,9 +123,9 @@ def stalefile_decorator(
     hash: Hashes,
     hash_mode: Optional[HashMode] = None,
     hash_algo: Optional[HashAlgo] = None,
-    make_file_fn: Optional[Callable[[HashPath], NoReturn]] = None,
+    make_file_fn: Optional[Callable[[HashPath], None]] = None,
 ) -> Union[
-    Callable[[Callable[[HashPath], NoReturn]], Callable[[], HashPath]],
+    Callable[[Callable[[HashPath], None]], Callable[[], HashPath]],
     Callable[[], HashPath],
 ]:
     """
@@ -129,7 +135,7 @@ def stalefile_decorator(
     """
 
     def decorator(
-        make_file_fn: Callable[[HashPath], NoReturn],
+        make_file_fn: Callable[[HashPath], None],
     ) -> Callable[[], HashPath]:
         @wraps(make_file_fn)
         def make_file_if_stale() -> HashPath:
@@ -177,7 +183,7 @@ class Stalefile(object):
         self._hash_mode = hash_mode
         self._hash_algo = hash_algo
 
-    def generate(self, make_file_fn: Callable[[HashPath], NoReturn]) -> HashPath:
+    def generate(self, make_file_fn: Callable[[HashPath], None]) -> HashPath:
         return stalefile_generate(
             make_file_fn=make_file_fn,
             path=self._path,
@@ -187,7 +193,7 @@ class Stalefile(object):
         )
 
     def decorator(
-        self, make_file_fn: Optional[Callable[[HashPath], NoReturn]] = None
+        self, make_file_fn: Optional[Callable[[HashPath], None]] = None
     ) -> Callable[[], HashPath]:
         # the wrapped function should take in a path and produce a file at that location.
         # a. if the file already exists, this function is not called!
@@ -210,19 +216,6 @@ class Stalefile(object):
 
     def __bool__(self):
         return self.is_stale()
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    "stalefile_is_stale",
-    "stalefile_generate",
-    "stalefile_decorator",
-    "Stalefile",
-)
 
 
 # ========================================================================= #

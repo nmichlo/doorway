@@ -22,6 +22,10 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+__all__ = [
+    "io_download",
+]
+
 import logging
 import os
 import warnings
@@ -83,14 +87,6 @@ def io_download(
             for data in response.iter_content(chunk_size=chunk_size):
                 fp.write(data)
                 progress.update(chunk_size)
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = ("io_download",)
 
 
 # ========================================================================= #
