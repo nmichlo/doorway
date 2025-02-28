@@ -104,8 +104,8 @@ class EnvVar(Generic[T]):
         validator: Optional[EnvVarFnValidatorHint[T]] = None,  # applied to all values
     ):
         self._key = key
-        self._env_converter = converter
-        self._val_validator = validator
+        self._env_converter = converter or (lambda x: x)
+        self._val_validator = validator or (lambda x: x)
         # do not apply validator until get, more inefficient, but easier to test
         self._persisted_default = default  # value not passed through convert, only val
         self._persisted_override = None  # value not passed through convert, only val
