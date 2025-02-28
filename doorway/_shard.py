@@ -16,12 +16,12 @@ from doorway._hash import hash_str
 # ========================================================================= #
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 _SHARD_KEYS = {
-    'basename': os.path.basename,
-    'abspath': os.path.abspath,
-    'input': lambda x: x,
+    "basename": os.path.basename,
+    "abspath": os.path.abspath,
+    "input": lambda x: x,
 }
 
 ShardKey = Optional[Union[str, Callable[[T], str]]]
@@ -40,12 +40,18 @@ def shard_hash(
     elif isinstance(shard_key, str):
         fn = _SHARD_KEYS.get(shard_key, None)  # cannot be None here
         if fn is None:
-            raise KeyError(f'if shard_key is a str, it must be one of: {list(_SHARD_KEYS.keys())}, got: {repr(shard_key)}')
+            raise KeyError(
+                f"if shard_key is a str, it must be one of: {list(_SHARD_KEYS.keys())}, got: {repr(shard_key)}"
+            )
         value = fn(value)
     else:
-        raise ValueError(f'shard_key must be a str, callable or None, got: {repr(shard_key)}')
+        raise ValueError(
+            f"shard_key must be a str, callable or None, got: {repr(shard_key)}"
+        )
     # get the string
-    assert isinstance(value, (str, Path)), f'The value after shard_key is applied must be a str or Path, instead got type: {type(value)}, with value: {repr(value)}'
+    assert isinstance(value, (str, Path)), (
+        f"The value after shard_key is applied must be a str or Path, instead got type: {type(value)}, with value: {repr(value)}"
+    )
     # compute the hash
     return hash_str(str(value), hash_algo=hash_algo)
 
@@ -56,7 +62,9 @@ def shard_idx(
     shard_key: ShardKey[T] = None,
     hash_algo: Optional[HashAlgo] = None,
 ) -> int:
-    assert isinstance(num_shards, int) and (num_shards > 0), f'num_shards must be an integer that is > 0, got: {repr(num_shards)}'
+    assert isinstance(num_shards, int) and (num_shards > 0), (
+        f"num_shards must be an integer that is > 0, got: {repr(num_shards)}"
+    )
     # compute the hash for the value
     hash = shard_hash(value, shard_key=shard_key, hash_algo=hash_algo)
     # convert hashes to integers, and assign to correct split
@@ -69,9 +77,9 @@ def shard_idx(
 
 
 _SHARD_RETURNS = {
-    'pairs':   lambda i, value: (i, value),
-    'indices': lambda i, value: i,
-    'values':  lambda i, value: value,
+    "pairs": lambda i, value: (i, value),
+    "indices": lambda i, value: i,
+    "values": lambda i, value: value,
 }
 
 
@@ -80,14 +88,16 @@ def sharded(
     num_shards: int,
     shard_key: ShardKey[T] = None,
     hash_algo: Optional[HashAlgo] = None,
-    returns: str = 'values'
+    returns: str = "values",
 ) -> list:
     """
     Shard files based on their hashes instead of random seeds
     """
     # shard functions
     if returns not in _SHARD_RETURNS:
-        raise KeyError(f'invalid shards returns: {repr(returns)}, must be one of: {sorted(_SHARD_RETURNS.keys())}')
+        raise KeyError(
+            f"invalid shards returns: {repr(returns)}, must be one of: {sorted(_SHARD_RETURNS.keys())}"
+        )
     value_getter = _SHARD_RETURNS[returns]
     # create new array of shards
     shards = [[] for _ in range(num_shards)]
@@ -104,7 +114,7 @@ def sharded_and_grouped(
     group_sizes: Iterable[int],
     shard_key: ShardKey[T] = None,
     hash_algo: Optional[HashAlgo] = None,
-    returns: str = 'values'
+    returns: str = "values",
 ) -> list:
     """
     Shard files based on their hashes instead of random seeds
@@ -113,7 +123,9 @@ def sharded_and_grouped(
     """
     group_sizes = list(group_sizes)
     # checks
-    assert all(isinstance(size, int) and (size >= 0) for size in group_sizes), f'values of group_sizes must be integers that are >= 0, got: {repr(group_sizes)}'
+    assert all(isinstance(size, int) and (size >= 0) for size in group_sizes), (
+        f"values of group_sizes must be integers that are >= 0, got: {repr(group_sizes)}"
+    )
     # get all the shards
     shards = sharded(
         values=values,
@@ -125,7 +137,7 @@ def sharded_and_grouped(
     # group all the shards together
     splits, i = [], 0
     for size in group_sizes:
-        splits.append([path for shard in shards[i:i+size] for path in shard])
+        splits.append([path for shard in shards[i : i + size] for path in shard])
         i += size
     # done!
     return splits
@@ -137,10 +149,10 @@ def sharded_and_grouped(
 
 
 __all__ = (
-    'shard_hash',
-    'shard_idx',
-    'sharded',
-    'sharded_and_grouped',
+    "shard_hash",
+    "shard_idx",
+    "sharded",
+    "sharded_and_grouped",
 )
 
 

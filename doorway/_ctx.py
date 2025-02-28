@@ -1,4 +1,3 @@
-
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 #  MIT License
 #
@@ -38,7 +37,7 @@ from typing import Dict
 @contextlib.contextmanager
 def ctx_no_stdout():
     old_stdout = sys.stdout
-    sys.stdout = open(os.devnull, 'w')
+    sys.stdout = open(os.devnull, "w")
     try:
         yield
     finally:
@@ -48,7 +47,7 @@ def ctx_no_stdout():
 @contextlib.contextmanager
 def ctx_no_stderr():
     old_stderr = sys.stderr
-    sys.stderr = open(os.devnull, 'w')
+    sys.stderr = open(os.devnull, "w")
     try:
         yield
     finally:
@@ -138,12 +137,12 @@ def ctx_temp_environ(environment: Dict[str, Any] = None, **env_kwargs):
 
 
 __all__ = (
-    'ctx_no_stdout',
-    'ctx_no_stderr',
-    'ctx_temp_attr',
-    'ctx_temp_wd',
-    'ctx_temp_sys_args',
-    'ctx_temp_environ',
+    "ctx_no_stdout",
+    "ctx_no_stderr",
+    "ctx_temp_attr",
+    "ctx_temp_wd",
+    "ctx_temp_sys_args",
+    "ctx_temp_environ",
 )
 
 

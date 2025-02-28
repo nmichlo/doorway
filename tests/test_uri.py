@@ -37,7 +37,12 @@ from doorway.x._uri import uri_validate
 
 def test_uri_type_enum():
     assert len(EnumUriType) == 4
-    assert list(EnumUriType) == [EnumUriType.FILE, EnumUriType.URL, EnumUriType.S3, EnumUriType.SSH]
+    assert list(EnumUriType) == [
+        EnumUriType.FILE,
+        EnumUriType.URL,
+        EnumUriType.S3,
+        EnumUriType.SSH,
+    ]
     # test types
     assert isinstance(EnumUriType.FILE, EnumUriType)
     assert isinstance(EnumUriType.FILE.value, str)
@@ -62,77 +67,88 @@ def test_uri_type_enum():
 
 def test_filename_from_uri():
     # test paths
-    uri_validate('basename')
-    uri_validate('basename.ext')
-    uri_validate('basename.ext/path')
-    uri_validate('/basename.ext/path')
-    uri_validate('./basename.ext/path')
-    uri_validate('/')
-    uri_validate('./')
-    uri_validate('.')
-    with pytest.raises(UriMalformedException, match="field 'path' is required, but got value: None"): uri_validate('')
+    uri_validate("basename")
+    uri_validate("basename.ext")
+    uri_validate("basename.ext/path")
+    uri_validate("/basename.ext/path")
+    uri_validate("./basename.ext/path")
+    uri_validate("/")
+    uri_validate("./")
+    uri_validate(".")
+    with pytest.raises(
+        UriMalformedException, match="field 'path' is required, but got value: None"
+    ):
+        uri_validate("")
 
     # test basic urls
-    uri_validate('http://prefix/basename.ext/suffix')
-    uri_validate('http://basename.ext/suffix')
-    uri_validate('HTTP://basename.ext/suffix')
-    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: None"): uri_validate('http:/basename.ext/suffix')
-    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: None"): uri_validate('http:///basename.ext/suffix')
+    uri_validate("http://prefix/basename.ext/suffix")
+    uri_validate("http://basename.ext/suffix")
+    uri_validate("HTTP://basename.ext/suffix")
+    with pytest.raises(
+        UriMalformedException, match="field 'host' is required, but got value: None"
+    ):
+        uri_validate("http:/basename.ext/suffix")
+    with pytest.raises(
+        UriMalformedException, match="field 'host' is required, but got value: None"
+    ):
+        uri_validate("http:///basename.ext/suffix")
 
     # test url ports
-    uri_validate('http://localhost:')
-    uri_validate('http://localhost:/suffix')
-    uri_validate('http://localhost:3000')
-    uri_validate('http://localhost:3000/suffix')
-    uri_validate('http://192.168.0.1')
-    uri_validate('http://192.168.0.1:')
-    uri_validate('http://192.168.0.1:3000')
-    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: ''"): uri_validate('http://:3000')
+    uri_validate("http://localhost:")
+    uri_validate("http://localhost:/suffix")
+    uri_validate("http://localhost:3000")
+    uri_validate("http://localhost:3000/suffix")
+    uri_validate("http://192.168.0.1")
+    uri_validate("http://192.168.0.1:")
+    uri_validate("http://192.168.0.1:3000")
+    with pytest.raises(
+        UriMalformedException, match="field 'host' is required, but got value: ''"
+    ):
+        uri_validate("http://:3000")
 
     # test urls and fragments etc
-    uri_validate('http://basename.ext/suffix?query')
-    uri_validate('http://basename.ext/suffix#fragment')
-    uri_validate('http://basename.ext/suffix?query#fragment')
-    uri_validate('http://basename.ext/suffix?query=5&query2=3#fragment')
-    uri_validate('http://basename.ext/suffix;params?query=5&query2=3#fragment')
-    uri_validate('http://basename.ext/suffix#fragment?query')
-    uri_validate('http://basename.ext/suffix#fragment?query')
+    uri_validate("http://basename.ext/suffix?query")
+    uri_validate("http://basename.ext/suffix#fragment")
+    uri_validate("http://basename.ext/suffix?query#fragment")
+    uri_validate("http://basename.ext/suffix?query=5&query2=3#fragment")
+    uri_validate("http://basename.ext/suffix;params?query=5&query2=3#fragment")
+    uri_validate("http://basename.ext/suffix#fragment?query")
+    uri_validate("http://basename.ext/suffix#fragment?query")
 
 
 def test_uri_paths_alt():
-
     def uri(inp, targ=None):
         targ = inp if (targ is None) else targ
         assert uri_parse(inp).geturl() == targ
 
-    uri(inp='path/uri_kind.ext')
-    uri(inp='/path/uri_kind.ext')
+    uri(inp="path/uri_kind.ext")
+    uri(inp="/path/uri_kind.ext")
 
-    uri(inp='../path/uri_kind.ext')
-    uri(inp='..//path/uri_kind.ext', targ='../path/uri_kind.ext')
-    uri(inp='..//path//uri_kind.ext', targ='../path/uri_kind.ext')
+    uri(inp="../path/uri_kind.ext")
+    uri(inp="..//path/uri_kind.ext", targ="../path/uri_kind.ext")
+    uri(inp="..//path//uri_kind.ext", targ="../path/uri_kind.ext")
 
-    uri(inp='../../path//uri_kind.ext', targ='../../path/uri_kind.ext')
-    uri(inp='../path/..//uri_kind.ext', targ='../uri_kind.ext')
+    uri(inp="../../path//uri_kind.ext", targ="../../path/uri_kind.ext")
+    uri(inp="../path/..//uri_kind.ext", targ="../uri_kind.ext")
 
-    uri(inp='file:/path/uri_kind.ext')
-    uri(inp='file:/path/uri_kind.ext')
-    uri(inp='file:/./path/uri_kind.ext', targ='file:/path/uri_kind.ext')
+    uri(inp="file:/path/uri_kind.ext")
+    uri(inp="file:/path/uri_kind.ext")
+    uri(inp="file:/./path/uri_kind.ext", targ="file:/path/uri_kind.ext")
 
-    uri(inp='./path/uri_kind.ext', targ='path/uri_kind.ext')
-    uri(inp='file:path/uri_kind.ext')
-    uri(inp='file:./path/uri_kind.ext', targ='file:path/uri_kind.ext')
-    uri(inp='file:.//path/uri_kind.ext', targ='file:path/uri_kind.ext')
-    uri(inp='file:.//.//path/uri_kind.ext', targ='file:path/uri_kind.ext')
+    uri(inp="./path/uri_kind.ext", targ="path/uri_kind.ext")
+    uri(inp="file:path/uri_kind.ext")
+    uri(inp="file:./path/uri_kind.ext", targ="file:path/uri_kind.ext")
+    uri(inp="file:.//path/uri_kind.ext", targ="file:path/uri_kind.ext")
+    uri(inp="file:.//.//path/uri_kind.ext", targ="file:path/uri_kind.ext")
 
-    uri(inp='file://path/uri_kind.ext', targ='file://path/uri_kind.ext')    # ERROR?
-    uri(inp='file://path/uri_kind.ext')                                     # ERROR?
-    uri(inp='file:///path/uri_kind.ext', targ='file:/path/uri_kind.ext')    # ERROR?
-    uri(inp='file://./path/uri_kind.ext')                                   # ERROR?
-    uri(inp='file:////path/uri_kind.ext', targ='file://path/uri_kind.ext')  # ERROR?
-    uri(inp='file:///./path/uri_kind.ext', targ='file:/path/uri_kind.ext')  # ERROR?
+    uri(inp="file://path/uri_kind.ext", targ="file://path/uri_kind.ext")  # ERROR?
+    uri(inp="file://path/uri_kind.ext")  # ERROR?
+    uri(inp="file:///path/uri_kind.ext", targ="file:/path/uri_kind.ext")  # ERROR?
+    uri(inp="file://./path/uri_kind.ext")  # ERROR?
+    uri(inp="file:////path/uri_kind.ext", targ="file://path/uri_kind.ext")  # ERROR?
+    uri(inp="file:///./path/uri_kind.ext", targ="file:/path/uri_kind.ext")  # ERROR?
 
-    uri(inp='http://google.com/asdf')
+    uri(inp="http://google.com/asdf")
 
 
 # ========================================================================= #

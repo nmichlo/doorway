@@ -49,29 +49,37 @@ def io_download(
         import requests
         from tqdm import tqdm
     except ImportError as e:
-        raise ImportError(f'`requests` and `tqdm` need to be installed for `{io_download.__name__}`') from e
+        raise ImportError(
+            f"`requests` and `tqdm` need to be installed for `{io_download.__name__}`"
+        ) from e
 
     # skip existing
     if skip_existing:
         if overwrite_existing:
-            warnings.warn('`overwrite_existing` takes precedence over `skip_existing`')
+            warnings.warn("`overwrite_existing` takes precedence over `skip_existing`")
         else:
             if os.path.exists(dst_path):
-                LOG.info(f'Skipping: {dst_path}')
+                LOG.info(f"Skipping: {dst_path}")
                 return
 
     # write the file
-    with AtomicOpen(dst_path, 'wb' if overwrite_existing else 'xb') as fp:
+    with AtomicOpen(dst_path, "wb" if overwrite_existing else "xb") as fp:
         response = requests.get(src_url, stream=True)
 
         # get the file size from the request for the progress bar
-        total_length = response.headers.get('content-length')
+        total_length = response.headers.get("content-length")
         if total_length is not None:
             total_length = int(total_length)
 
         # download with progress bar
-        LOG.info(f'Downloading: {src_url} to: {dst_path}')
-        with tqdm(total=total_length, desc=f'Downloading', unit='B', unit_scale=True, unit_divisor=1024) as progress:
+        LOG.info(f"Downloading: {src_url} to: {dst_path}")
+        with tqdm(
+            total=total_length,
+            desc=f"Downloading",
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+        ) as progress:
             for data in response.iter_content(chunk_size=chunk_size):
                 fp.write(data)
                 progress.update(chunk_size)
@@ -82,9 +90,7 @@ def io_download(
 # ========================================================================= #
 
 
-__all__ = (
-    'io_download',
-)
+__all__ = ("io_download",)
 
 
 # ========================================================================= #

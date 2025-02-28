@@ -35,11 +35,10 @@ from typing import TypeVar
 # ========================================================================= #
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class VarHandlerBase(Generic[T]):
-
     def __init__(
         self,
         identifier: str,
@@ -54,7 +53,7 @@ class VarHandlerBase(Generic[T]):
         self._value_default = None
         # values
         self._value_fallback = fallback_value
-        self._validate_value(self._value_fallback, source='fallback_value')
+        self._validate_value(self._value_fallback, source="fallback_value")
 
     # OVERRIDEABLE
 
@@ -83,7 +82,7 @@ class VarHandlerBase(Generic[T]):
     def set_default_value(self, value: Optional[T] = None) -> NoReturn:
         # make sure the hash_algo is valid
         if value is not None:
-            self._validate_value(value, source='set_default_value')
+            self._validate_value(value, source="set_default_value")
         # update the default mode
         self._value_default = value
 
@@ -99,13 +98,16 @@ class VarHandlerBase(Generic[T]):
           4. fallback mode ("fast")
         """
         if override is not None:
-            source, value = ('manual', override)
+            source, value = ("manual", override)
         elif self._value_default is not None:
-            source, value = ('default', self._value_default)
+            source, value = ("default", self._value_default)
         elif self._environ_key in os.environ:
-            source, value = ('environment', self._normalize_environ_value(os.environ[self._environ_key]))
+            source, value = (
+                "environment",
+                self._normalize_environ_value(os.environ[self._environ_key]),
+            )
         else:
-            source, value = ('fallback', self._value_fallback)
+            source, value = ("fallback", self._value_fallback)
         # make sure the hash mode is valid
         self._validate_value(value=value, source=source)
         # done
@@ -119,7 +121,6 @@ class VarHandlerBase(Generic[T]):
 
 # TODO: add handlers for different types, eg. bool
 class VarHandlerStr(VarHandlerBase[str]):
-
     def __init__(
         self,
         identifier: str,
@@ -131,13 +132,23 @@ class VarHandlerStr(VarHandlerBase[str]):
         self._allowed_values = set(allowed_values)
         # checks
         if len(self.allowed_values) <= 0:
-            raise ValueError(f'allowed_values must not be an empty sequence, got: {repr(self._allowed_values)}')
+            raise ValueError(
+                f"allowed_values must not be an empty sequence, got: {repr(self._allowed_values)}"
+            )
         if not all(isinstance(v, str) for v in self._allowed_values):
-            raise ValueError(f'all entries in the allowed_values must be strings, got: {repr(self._allowed_values)}')
+            raise ValueError(
+                f"all entries in the allowed_values must be strings, got: {repr(self._allowed_values)}"
+            )
         if fallback_value not in self._allowed_values:
-            raise ValueError(f'the fallback_value: {repr(fallback_value)} is not one of the allowed_values: {repr(self._allowed_values)}')
+            raise ValueError(
+                f"the fallback_value: {repr(fallback_value)} is not one of the allowed_values: {repr(self._allowed_values)}"
+            )
         # initialize
-        super().__init__(identifier=identifier, environ_key=environ_key, fallback_value=fallback_value)
+        super().__init__(
+            identifier=identifier,
+            environ_key=environ_key,
+            fallback_value=fallback_value,
+        )
 
     # CUSTOM
 
@@ -149,9 +160,13 @@ class VarHandlerStr(VarHandlerBase[str]):
 
     def _validate_value(self, value: str, source: Optional[str] = None) -> NoReturn:
         if not isinstance(value, str):
-            raise TypeError(f'invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {str}, got type: {type(value)}')
+            raise TypeError(
+                f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {str}, got type: {type(value)}"
+            )
         if value not in self._allowed_values:
-            raise KeyError(f'invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be one of the allowed_values: {self.allowed_values}')
+            raise KeyError(
+                f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be one of the allowed_values: {self.allowed_values}"
+            )
 
     def _normalize_environ_value(self, value: str) -> str:
         return value
@@ -163,14 +178,13 @@ class VarHandlerStr(VarHandlerBase[str]):
 
 
 class VarHandlerBool(VarHandlerBase[bool]):
-
     def __init__(
         self,
         identifier: str,
         environ_key: str,
         fallback_value: bool,
-        environ_keys_true: Sequence[str] = ('y', 'yes', 't', 'true', '1'),
-        environ_keys_false: Sequence[str] = ('n', 'no', 'f', 'false', '0'),
+        environ_keys_true: Sequence[str] = ("y", "yes", "t", "true", "1"),
+        environ_keys_false: Sequence[str] = ("n", "no", "f", "false", "0"),
         environ_to_lower_case: bool = True,
     ):
         # values
@@ -178,15 +192,25 @@ class VarHandlerBool(VarHandlerBase[bool]):
         self._environ_keys_false = set(environ_keys_false)
         self._environ_to_lower_case = environ_to_lower_case
         # checks
-        assert self._environ_keys_true and all(isinstance(v, str) for v in self._environ_keys_true)
-        assert self._environ_keys_false and all(isinstance(v, str) for v in self._environ_keys_false)
+        assert self._environ_keys_true and all(
+            isinstance(v, str) for v in self._environ_keys_true
+        )
+        assert self._environ_keys_false and all(
+            isinstance(v, str) for v in self._environ_keys_false
+        )
         assert isinstance(environ_to_lower_case, bool)
         # init
-        super().__init__(identifier=identifier, environ_key=environ_key, fallback_value=fallback_value)
+        super().__init__(
+            identifier=identifier,
+            environ_key=environ_key,
+            fallback_value=fallback_value,
+        )
 
     def _validate_value(self, value: bool, source: str) -> NoReturn:
         if not isinstance(value, bool):
-            raise TypeError(f'invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {bool}, got type: {type(value)}')
+            raise TypeError(
+                f"invalid {self.identifier}: {repr(value)}, obtained from source: {source}, must be of type {bool}, got type: {type(value)}"
+            )
 
     def _normalize_environ_value(self, value: str) -> bool:
         if self._environ_to_lower_case:
@@ -196,7 +220,9 @@ class VarHandlerBool(VarHandlerBase[bool]):
         elif value in self._environ_keys_false:
             return False
         else:
-            raise TypeError(f'cannot normalize environment variable `{self.environ_key}={repr(value)}` into {self.identifier}, must be one of: {sorted(self._environ_keys_true | self._environ_keys_false)}')
+            raise TypeError(
+                f"cannot normalize environment variable `{self.environ_key}={repr(value)}` into {self.identifier}, must be one of: {sorted(self._environ_keys_true | self._environ_keys_false)}"
+            )
 
 
 # ========================================================================= #
@@ -205,9 +231,9 @@ class VarHandlerBool(VarHandlerBase[bool]):
 
 
 __all__ = (
-    'VarHandlerBase',
-    'VarHandlerStr',
-    'VarHandlerBool',
+    "VarHandlerBase",
+    "VarHandlerStr",
+    "VarHandlerBool",
 )
 
 

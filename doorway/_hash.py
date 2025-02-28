@@ -40,7 +40,7 @@ from doorway._utils import VarHandlerStr
 
 
 def _yield_file_bytes(file: str, chunk_size=16384):
-    with open(file, 'rb') as f:
+    with open(file, "rb") as f:
         while True:
             bytes = f.read(chunk_size)
             if not bytes:
@@ -52,14 +52,14 @@ def _yield_fast_hash_bytes(file: str, chunk_size=16384, num_chunks=3):
     assert num_chunks >= 2
     # return the size in bytes
     size = os.path.getsize(file)
-    yield size.to_bytes(length=64//8, byteorder='big', signed=False)
+    yield size.to_bytes(length=64 // 8, byteorder="big", signed=False)
     # return file bytes chunks
     if size < chunk_size * num_chunks:
         # we can't return chunks because the file is too small, return everything!
         yield from _yield_file_bytes(file, chunk_size=chunk_size)
     else:
         # includes evenly spaced start, middle and end chunks
-        with open(file, 'rb') as f:
+        with open(file, "rb") as f:
             for i in range(num_chunks):
                 pos = (i * (size - chunk_size)) // (num_chunks - 1)
                 f.seek(pos)
@@ -84,15 +84,15 @@ HashPath = Union[str, Path]
 
 
 _FILE_BYTE_PRODUCERS = {
-    'full': _yield_file_bytes,
-    'fast': _yield_fast_hash_bytes,
+    "full": _yield_file_bytes,
+    "fast": _yield_fast_hash_bytes,
 }
 
 
 _VAR_HANDLER_HASH_MODE = VarHandlerStr(
-    identifier='hash_mode',
-    environ_key='DOORWAY_HASH_MODE',
-    fallback_value='fast',
+    identifier="hash_mode",
+    environ_key="DOORWAY_HASH_MODE",
+    fallback_value="fast",
     allowed_values=tuple(_FILE_BYTE_PRODUCERS.keys()),
 )
 
@@ -106,10 +106,12 @@ def hash_mode_get(hash_mode: Optional[HashMode] = None) -> HashMode:
 
 
 _VAR_HANDLER_HASH_ALGO = VarHandlerStr(
-    identifier='hash_algo',
-    environ_key='DOORWAY_HASH_ALGO',
-    fallback_value='md5',
-    allowed_values=tuple(hashlib.algorithms_guaranteed),  # hashlib.algorithms_available?
+    identifier="hash_algo",
+    environ_key="DOORWAY_HASH_ALGO",
+    fallback_value="md5",
+    allowed_values=tuple(
+        hashlib.algorithms_guaranteed
+    ),  # hashlib.algorithms_available?
 )
 
 
@@ -133,7 +135,9 @@ def hash_bytes(bytes_str: bytes, hash_algo: Optional[HashAlgo] = None) -> str:
     return hashlib.new(hash_algo, data=bytes_str).hexdigest()
 
 
-def hash_bytes_iter(bytes_iter: Iterable[bytes], hash_algo: Optional[HashAlgo] = None) -> str:
+def hash_bytes_iter(
+    bytes_iter: Iterable[bytes], hash_algo: Optional[HashAlgo] = None
+) -> str:
     # normalise the hash_algo
     hash_algo = hash_algo_get(hash_algo=hash_algo)
     # generate hash and convert to a string
@@ -143,7 +147,9 @@ def hash_bytes_iter(bytes_iter: Iterable[bytes], hash_algo: Optional[HashAlgo] =
     return hash.hexdigest()
 
 
-def hash_str(str: str, hash_algo: Optional[HashAlgo] = None, encoding: str = 'utf-8') -> str:
+def hash_str(
+    str: str, hash_algo: Optional[HashAlgo] = None, encoding: str = "utf-8"
+) -> str:
     # encode string as bytes and then hash
     return hash_bytes(str.encode(encoding), hash_algo=hash_algo)
 
@@ -168,11 +174,13 @@ def hash_file(
     path = str(path)
     if os.path.exists(path):
         if not os.path.isfile(path):
-            raise IsADirectoryError(f'the path exists but is not a file: {repr(path)}')
+            raise IsADirectoryError(f"the path exists but is not a file: {repr(path)}")
     else:
         if hash_missing:
-            return ''
-        raise FileNotFoundError(f'could not compute hash for missing file: {repr(path)}')
+            return ""
+        raise FileNotFoundError(
+            f"could not compute hash for missing file: {repr(path)}"
+        )
     # get file bytes iterator
     byte_producer = _FILE_BYTE_PRODUCERS[hash_mode]
     bytes_iter = byte_producer(path)
@@ -209,21 +217,29 @@ def hash_norm(
     if isinstance(hash, dict):
         hash_mode = hash_mode_get(hash_mode)
         hash_algo = hash_algo_get(hash_algo)
-        multi_key = f'{hash_mode}:{hash_algo}'
+        multi_key = f"{hash_mode}:{hash_algo}"
         # 1. try get `mode:algo`
         if multi_key in hash:
             hash = hash[multi_key]
         elif hash_mode in hash:
-            warnings.warn('obtaining the hash directly from the `hash_mode` is deprecated, please use the full key `hash_mode:hash_algo`')
+            warnings.warn(
+                "obtaining the hash directly from the `hash_mode` is deprecated, please use the full key `hash_mode:hash_algo`"
+            )
             hash = hash[hash_mode]
         elif hash_algo in hash:
-            warnings.warn('obtaining the hash directly from the `hash_algo` is deprecated, please use the full key `hash_mode:hash_algo`')
+            warnings.warn(
+                "obtaining the hash directly from the `hash_algo` is deprecated, please use the full key `hash_mode:hash_algo`"
+            )
             hash = hash[hash_algo]
         else:
-            raise KeyError(f'hash dictionary does not contain a valid key for either 1. {repr(multi_key)}, 2. {repr(hash_mode)}, or 3. {repr(hash_algo)}. Available hash keys are: {sorted(hash.keys())}')
+            raise KeyError(
+                f"hash dictionary does not contain a valid key for either 1. {repr(multi_key)}, 2. {repr(hash_mode)}, or 3. {repr(hash_algo)}. Available hash keys are: {sorted(hash.keys())}"
+            )
     # check the result
     if not isinstance(hash, str):
-        raise TypeError(f'normalized hash should be a str, got type: {type(hash)} for value: {repr(hash)}')
+        raise TypeError(
+            f"normalized hash should be a str, got type: {type(hash)} for value: {repr(hash)}"
+        )
     # done!
     return hash
 
@@ -241,14 +257,18 @@ def hash_file_validate(
     # normalize the hash
     hash: str = hash_norm(hash=hash, hash_mode=hash_mode)
     # compute the hash
-    fhash = hash_file(path=path, hash_algo=hash_algo, hash_mode=hash_mode, hash_missing=hash_missing)
+    fhash = hash_file(
+        path=path, hash_algo=hash_algo, hash_mode=hash_mode, hash_missing=hash_missing
+    )
     # check the hash
     if fhash != hash:
         # functions above also call this, we need to do it again for the error message
         hash_mode = hash_mode_get(hash_mode)
         hash_algo = hash_algo_get(hash_algo)
         # raise the error!
-        raise HashError(f'computed {hash_mode} {hash_algo} hash: {repr(fhash)} does not match expected hash: {repr(hash)} for file: {repr(path)}')
+        raise HashError(
+            f"computed {hash_mode} {hash_algo} hash: {repr(fhash)} does not match expected hash: {repr(hash)} for file: {repr(path)}"
+        )
 
 
 def hash_file_is_valid(
@@ -259,7 +279,13 @@ def hash_file_is_valid(
     hash_missing: bool = False,
 ) -> bool:
     try:
-        hash_file_validate(path=path, hash=hash, hash_algo=hash_algo, hash_mode=hash_mode, hash_missing=hash_missing)
+        hash_file_validate(
+            path=path,
+            hash=hash,
+            hash_algo=hash_algo,
+            hash_mode=hash_mode,
+            hash_missing=hash_missing,
+        )
     except HashError:
         return False
     return True
@@ -272,27 +298,27 @@ def hash_file_is_valid(
 
 __all__ = (
     # types
-    'Hash',
-    'Hashes',
-    'HashMode',
-    'HashAlgo',
-    'HashPath',
+    "Hash",
+    "Hashes",
+    "HashMode",
+    "HashAlgo",
+    "HashPath",
     # errors
-    'HashError',
+    "HashError",
     # hash mode
-    'hash_mode_set_default',
-    'hash_mode_get',
-    'hash_algo_set_default',
-    'hash_algo_get',
+    "hash_mode_set_default",
+    "hash_mode_get",
+    "hash_algo_set_default",
+    "hash_algo_get",
     # normalise hash
-    'hash_norm',
+    "hash_norm",
     # compute hash
-    'hash_bytes',
-    'hash_bytes_iter',
-    'hash_str',
-    'hash_file',
-    'hash_file_validate',
-    'hash_file_is_valid',
+    "hash_bytes",
+    "hash_bytes_iter",
+    "hash_str",
+    "hash_file",
+    "hash_file_validate",
+    "hash_file_is_valid",
 )
 
 
