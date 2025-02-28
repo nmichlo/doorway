@@ -10,13 +10,14 @@ name = "doorway"
 dynamic = ["version"]  # Version is managed by setuptools_scm
 description = "Essential utilities for working with files, directories, and data."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 license = { file = "LICENSE" }
 authors = [{ name = "Nathan Juraj Michlo", email = "NathanJMichlo@gmail.com" }]
 urls = { Homepage = "https://github.com/nmichlo/doorway" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
