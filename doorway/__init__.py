@@ -76,7 +76,7 @@ __all__ = [
     "shard_hash",
     "shard_idx",
     "sharded",
-    "sharded_and_grouped",
+    "sharded_weighted",
     # ===== stale ===== #
     "stalefile_is_stale",
     "stalefile_generate",
@@ -141,7 +141,7 @@ from doorway._shard import (
     shard_hash,
     shard_idx,
     sharded,
-    sharded_and_grouped,
+    sharded_weighted,
 )
 from doorway._stale import (
     stalefile_is_stale,

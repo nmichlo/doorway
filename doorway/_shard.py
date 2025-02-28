@@ -27,12 +27,12 @@ __all__ = [
     "shard_hash",
     "shard_idx",
     "sharded",
-    "sharded_and_grouped",
+    "sharded_weighted",
 ]
 
 import os
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List, Literal, Tuple
 from typing import Iterable
 from typing import Optional
 from typing import Union
@@ -114,14 +114,21 @@ _SHARD_RETURNS = {
     "values": lambda i, value: value,
 }
 
+_ShardsReturnHint = Union[
+    List[Tuple[int, T]],  # pairs
+    List[int],  # indices
+    List[T],  # values
+]
+
 
 def sharded(
     values: Iterable[T],
     num_shards: int,
+    *,
     shard_key: ShardKey[T] = None,
     hash_algo: Optional[HashAlgo] = None,
-    returns: str = "values",
-) -> list:
+    returns: Literal["pairs", "indices", "values"] = "values",
+) -> _ShardsReturnHint[T]:
     """
     Shard files based on their hashes instead of random seeds
     """
@@ -141,38 +148,41 @@ def sharded(
     return shards
 
 
-def sharded_and_grouped(
+def sharded_weighted(
     values: Iterable[T],
-    group_sizes: Iterable[int],
+    shard_weights: Iterable[int],
+    *,
     shard_key: ShardKey[T] = None,
     hash_algo: Optional[HashAlgo] = None,
-    returns: str = "values",
-) -> list:
+    returns: Literal["pairs", "indices", "values"] = "values",
+) -> _ShardsReturnHint[T]:
     """
-    Shard files based on their hashes instead of random seeds
+    Shard files based on their hashes instead of random seeds, and group them based on weights
     -- This is useful if you need to split a dataset, but you expect changes to be made to it,
        eg. files will always randomly be assigned to the same shared
     """
-    group_sizes = list(group_sizes)
+    shard_weights = list(shard_weights)
     # checks
-    assert all(isinstance(size, int) and (size >= 0) for size in group_sizes), (
-        f"values of group_sizes must be integers that are >= 0, got: {repr(group_sizes)}"
+    assert all(isinstance(size, int) and (size >= 0) for size in shard_weights), (
+        f"values of group_sizes must be integers that are >= 0, got: {repr(shard_weights)}"
     )
     # get all the shards
     shards = sharded(
         values=values,
-        num_shards=sum(group_sizes),
+        num_shards=sum(shard_weights),
         shard_key=shard_key,
         hash_algo=hash_algo,
         returns=returns,
     )
     # group all the shards together
-    splits, i = [], 0
-    for size in group_sizes:
-        splits.append([path for shard in shards[i : i + size] for path in shard])
-        i += size
+    weighted_buckets, i = [], 0
+    for num_shards in shard_weights:
+        weighted_buckets.append(
+            [item for shard in shards[i : i + num_shards] for item in shard]
+        )
+        i += num_shards
     # done!
-    return splits
+    return weighted_buckets
 
 
 # ========================================================================= #

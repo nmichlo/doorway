@@ -225,6 +225,23 @@ class EnvVar(Generic[T]):
 
         return _validator
 
+    @classmethod
+    def validator_min_max(
+        cls, min_value: Optional[T], max_value: Optional[T]
+    ) -> EnvVarFnValidatorHint[T]:
+        def _validator(value: T) -> T:
+            if min_value is not None and value < min_value:
+                raise EnvVarValidationError(
+                    f"value {repr(value)} must be greater than or equal to {min_value}"
+                )
+            if max_value is not None and value > max_value:
+                raise EnvVarValidationError(
+                    f"value {repr(value)} must be less than or equal to {max_value}"
+                )
+            return value
+
+        return _validator
+
     # ===== factory methods ===== #
 
     @classmethod

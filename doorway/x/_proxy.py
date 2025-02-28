@@ -469,7 +469,7 @@ class ProxyDownloader:
     def download_threaded(
         self,
         url_file_tuples: Iterable[Tuple[str, Union[str, Path]]],
-        exists_mode: str = "error",
+        exists_mode: Literal["error", "skip", "overwrite"] = "error",
         verbose: bool = False,
         make_dirs: bool = False,
         ignore_failures=False,
