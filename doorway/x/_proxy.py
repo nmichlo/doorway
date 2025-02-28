@@ -52,6 +52,7 @@ from typing import Optional
 from typing import Sequence
 from typing import Tuple
 
+from doorway import EnvVar
 
 _LOGGER = getLogger(__name__)
 
@@ -226,8 +227,7 @@ def _scrape_proxylist_geonode_com(proxy_type: ProxyTypeHint) -> List[ProxyDictHi
 
 @proxies_register_scraper("morph.io")
 def _scrape_proxies_morph(proxy_type: ProxyTypeHint) -> List[ProxyDictHint]:
-    assert "MORPH_API_KEY" in os.environ, "MORPH_API_KEY environment variable not set!"
-    morph_api_key = os.environ["MORPH_API_KEY"]
+    morph_api_key = EnvVar.env_str("MORPH_API_KEY").get()
     morph_api_url = "https://api.morph.io/CookieMichal/us-proxy/data.json"
 
     query = (
