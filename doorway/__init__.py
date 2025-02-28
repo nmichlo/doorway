@@ -34,6 +34,7 @@ __all__ = [
     "ctx_temp_wd",
     "ctx_temp_sys_args",
     "ctx_temp_environ",
+    "ctx_do_undo",
     # ===== env_vars ===== #
     "EnvVar",
     # errors
@@ -98,6 +99,7 @@ from doorway._ctx import (
     ctx_temp_wd,
     ctx_temp_sys_args,
     ctx_temp_environ,
+    ctx_do_undo,
 )
 from doorway._env_vars import (
     EnvVar,

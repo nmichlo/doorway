@@ -30,13 +30,15 @@ __all__ = [
     "ctx_temp_wd",
     "ctx_temp_sys_args",
     "ctx_temp_environ",
+    "ctx_do_undo",
 ]
 
 
 import os
 import sys
 import contextlib
-from typing import Any
+import warnings
+from typing import Any, Callable
 from typing import Dict
 
 
@@ -75,6 +77,8 @@ _DELETE = object()
 
 @contextlib.contextmanager
 def ctx_temp_attr(obj, name, value):
+    if not hasattr(obj, name):
+        warnings.warn(f"object does not have attribute: {name}")
     # if we should delete this or just reset it
     prev_val = getattr(obj, name, _DELETE)
     # overwrite the value
@@ -88,6 +92,18 @@ def ctx_temp_attr(obj, name, value):
             delattr(obj, name)
         else:
             setattr(obj, name, prev_val)
+
+
+@contextlib.contextmanager
+def ctx_do_undo(
+    do: Callable[[], Any],
+    undo: Callable[[], Any],
+):
+    try:
+        do()
+        yield
+    finally:
+        undo()
 
 
 # ========================================================================= #
