@@ -24,7 +24,7 @@
 
 import os
 from logging import getLogger
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Union
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -317,7 +317,7 @@ class ProxyDownloader:
 
     def __init__(
         self,
-        proxies: Sequence[Dict[str, str]] | None | str = None,
+        proxies: Optional[Union[Sequence[Dict[str, str]], str]] = None,
         req_min_remove_count=5,
         req_max_fail_ratio=0.5,
     ):
