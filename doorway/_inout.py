@@ -22,7 +22,16 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+__all__ = [
+    "io_download",
+]
+
 import logging
+import os
+import warnings
+from typing import Literal
+
+
 from doorway._atomic import AtomicOpen
 
 
@@ -37,41 +46,67 @@ LOG = logging.getLogger(__name__)
 def io_download(
     src_url: str,
     dst_path: str,
-    overwrite_existing: bool = False,
+    *,
+    exists_mode: Literal["skip", "overwrite", "error"] = "error",
     chunk_size: int = 16384,
+    progress: bool = True,
 ):
     # make sure we have the correct imports
     try:
         import requests
-        from tqdm import tqdm
     except ImportError as e:
-        raise ImportError(f'`requests` and `tqdm` need to be installed for `{io_download.__name__}`') from e
+        raise ImportError(
+            f"`requests` need to be installed for `{io_download.__name__}`"
+        ) from e
+
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        warnings.warn(
+            f"`tqdm` is not installed, progress bar will not be shown for `{io_download.__name__}`"
+        )
+        tqdm = None
+        progress = False
+
+    # skip existing
+    if exists_mode == "skip":
+        if os.path.exists(dst_path):
+            LOG.info(f"Skipping: {dst_path}")
+            return
+        overwrite = False
+    elif exists_mode == "overwrite":
+        overwrite = True
+    elif exists_mode == "error":
+        overwrite = False
+    else:
+        raise ValueError(f"invalid `exists_mode`: {exists_mode}")
 
     # write the file
-    with AtomicOpen(dst_path, 'wb' if overwrite_existing else 'xb') as fp:
+    with AtomicOpen(dst_path, "wb" if overwrite else "xb") as fp:
         response = requests.get(src_url, stream=True)
 
         # get the file size from the request for the progress bar
-        total_length = response.headers.get('content-length')
+        total_length = response.headers.get("content-length")
         if total_length is not None:
             total_length = int(total_length)
 
         # download with progress bar
-        LOG.info(f'Downloading: {src_url} to: {dst_path}')
-        with tqdm(total=total_length, desc=f'Downloading', unit='B', unit_scale=True, unit_divisor=1024) as progress:
+        LOG.info(f"Downloading: {src_url} to: {dst_path}")
+
+        if progress and tqdm is not None:
+            with tqdm(
+                total=total_length,
+                desc="Downloading",
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as progress:
+                for data in response.iter_content(chunk_size=chunk_size):
+                    fp.write(data)
+                    progress.update(chunk_size)
+        else:
             for data in response.iter_content(chunk_size=chunk_size):
                 fp.write(data)
-                progress.update(chunk_size)
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    'io_download',
-)
 
 
 # ========================================================================= #

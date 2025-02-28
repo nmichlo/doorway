@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages]
+find = {}
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0" # error
+
+[project]
+name = "doorway"
+dynamic = ["version"]  # Version is managed by setuptools_scm
+description = "Essential utilities for working with files, directories, and data."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Nathan Juraj Michlo", email = "NathanJMichlo@gmail.com" }]
+urls = { Homepage = "https://github.com/nmichlo/doorway" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Intended Audience :: Science/Research"
+]
+
+dependencies = [
+    "rfc3986>=1",
+]
+
+[project.optional-dependencies]
+
+dev = [
+    "pre-commit>=2,<3",
+]
+
+test = [
+    "pytest>=7",
+    "pytest-cov>=2",
+]
+
+extra = [
+    "requests",
+    "cachier",
+    "tqdm",
+    "beautifulsoup4",
+]

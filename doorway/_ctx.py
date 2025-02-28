@@ -1,4 +1,3 @@
-
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 #  MIT License
 #
@@ -23,10 +22,23 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+
+__all__ = [
+    "ctx_no_stdout",
+    "ctx_no_stderr",
+    "ctx_temp_attr",
+    "ctx_temp_wd",
+    "ctx_temp_sys_args",
+    "ctx_temp_environ",
+    "ctx_do_undo",
+]
+
+
 import os
 import sys
 import contextlib
-from typing import Any
+import warnings
+from typing import Any, Callable
 from typing import Dict
 
 
@@ -38,7 +50,7 @@ from typing import Dict
 @contextlib.contextmanager
 def ctx_no_stdout():
     old_stdout = sys.stdout
-    sys.stdout = open(os.devnull, 'w')
+    sys.stdout = open(os.devnull, "w")
     try:
         yield
     finally:
@@ -48,7 +60,7 @@ def ctx_no_stdout():
 @contextlib.contextmanager
 def ctx_no_stderr():
     old_stderr = sys.stderr
-    sys.stderr = open(os.devnull, 'w')
+    sys.stderr = open(os.devnull, "w")
     try:
         yield
     finally:
@@ -65,6 +77,8 @@ _DELETE = object()
 
 @contextlib.contextmanager
 def ctx_temp_attr(obj, name, value):
+    if not hasattr(obj, name):
+        warnings.warn(f"object does not have attribute: {name}")
     # if we should delete this or just reset it
     prev_val = getattr(obj, name, _DELETE)
     # overwrite the value
@@ -78,6 +92,18 @@ def ctx_temp_attr(obj, name, value):
             delattr(obj, name)
         else:
             setattr(obj, name, prev_val)
+
+
+@contextlib.contextmanager
+def ctx_do_undo(
+    do: Callable[[], Any],
+    undo: Callable[[], Any],
+):
+    try:
+        do()
+        yield
+    finally:
+        undo()
 
 
 # ========================================================================= #
@@ -130,21 +156,6 @@ def ctx_temp_environ(environment: Dict[str, Any] = None, **env_kwargs):
                 os.environ[k] = old_env[k]
             else:
                 del os.environ[k]
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    'ctx_no_stdout',
-    'ctx_no_stderr',
-    'ctx_temp_attr',
-    'ctx_temp_wd',
-    'ctx_temp_sys_args',
-    'ctx_temp_environ',
-)
 
 
 # ========================================================================= #

@@ -22,12 +22,18 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+
+__all__ = [
+    "fmt_use_colors_get",
+    "fmt_bytes_to_human",
+]
+
+
 import math
-from typing import NoReturn
 from typing import Optional
 
 import doorway._colors as c
-from doorway._utils import VarHandlerBool
+from doorway._env_vars import EnvVar
 
 
 # ========================================================================= #
@@ -35,19 +41,14 @@ from doorway._utils import VarHandlerBool
 # ========================================================================= #
 
 
-_VAR_HANDLER_USE_COLORS = VarHandlerBool(
-    identifier='colors',
-    environ_key='DOORWAY_ENABLE_COLORS',
-    fallback_value=True,
+_VAR_HANDLER_USE_COLORS = EnvVar.env_bool(
+    key="DOORWAY_ENABLE_COLORS",
+    default=True,
 )
 
 
-def fmt_use_colors_set_default(use_colors: Optional[bool]) -> NoReturn:
-    return _VAR_HANDLER_USE_COLORS.set_default_value(value=use_colors)
-
-
 def fmt_use_colors_get(use_colors: Optional[bool] = None) -> bool:
-    return _VAR_HANDLER_USE_COLORS.get_value(override=use_colors)
+    return _VAR_HANDLER_USE_COLORS.get(override=use_colors)
 
 
 # ========================================================================= #
@@ -56,10 +57,20 @@ def fmt_use_colors_get(use_colors: Optional[bool] = None) -> bool:
 
 
 # the names and colours of the different units
-_BYTES_UNIT_COLORS = (c.WHT, c.lGRN, c.lYLW, c.lRED, c.lRED, c.lRED, c.lRED, c.lRED, c.lRED)
+_BYTES_UNIT_COLORS = (
+    c.WHT,
+    c.lGRN,
+    c.lYLW,
+    c.lRED,
+    c.lRED,
+    c.lRED,
+    c.lRED,
+    c.lRED,
+    c.lRED,
+)
 _BYTES_UNIT_NAMES = {
-    1024: ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"),
-    1000: ("B", "KB",  "MB",  "GB",  "TB",  "PB",  "EB",  "ZB",  "YB"),
+    1024: ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "RiB", "QiB"),
+    1000: ("B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB", "RB", "QB"),
 }
 
 # amount of extra padding to add to the left of the dot
@@ -76,6 +87,7 @@ _BYTES_UNIT_PADDING = {
 
 def fmt_bytes_to_human(
     size_bytes: int,
+    *,
     base: int = 1024,
     decimals: int = 3,
     align: bool = False,
@@ -85,18 +97,46 @@ def fmt_bytes_to_human(
     """
     Obtain the human-readable string representation of the given bytes
 
-    NOTE: this does not handle values greater than "YB" or "YiB"
-          as there is no official SI unit above these
+    SI Units - base 1000
+        k   kilo   1000**1  !!! lowercase k is used for kilo, because uppercase K is used for kelvin
+        M   mega   1000**2
+        G   giga   1000**3
+        T   tera   1000**4
+        P   peta   1000**5
+        E   exa    1000**6
+        Z   zetta  1000**7
+        Y   yotta  1000**8
+        R   ronna  1000**9
+        Q   quetta 1000**10
+
+    IEC Units - base 1024
+        Symbol	Prefix	Example	Size
+        Ki kibi  kibibyte  (KiB) 2**10  (1024**1)
+        Mi mebi  mebibyte  (MiB) 2**20  (1024**2)
+        Gi gibi  gibibyte  (GiB) 2**30  (1024**3)
+        Ti tebi  tebibyte  (TiB) 2**40  (1024**4)
+        Pi pebi  pebibyte  (PiB) 2**50  (1024**5)
+        Ei exbi  exbibyte  (EiB) 2**60  (1024**6)
+        Zi zebi  zebibyte  (ZiB) 2**70  (1024**7)
+        Yi yobi  yobibyte  (YiB) 2**80  (1024**8)
+        Ri robi  robibyte  (RiB) 2**90  (1024**9)
+        Qi quebi quebibyte (QiB) 2**100 (1024**10)
     """
     # check the unit of measurement
     if not isinstance(size_bytes, int):
-        raise TypeError(f'invalid size in bytes, must be of type `int`, got: {type(size_bytes)}')
+        raise TypeError(
+            f"invalid size in bytes, must be of type `int`, got: {type(size_bytes)}"
+        )
     if not isinstance(base, int):
-        raise TypeError(f'invalid bytes base number, must be of type `int`, got: {type(base)}')
+        raise TypeError(
+            f"invalid bytes base number, must be of type `int`, got: {type(base)}"
+        )
     if size_bytes < 0:
-        raise ValueError(f'invalid size in bytes, cannot be negative: {size_bytes}')
+        raise ValueError(f"invalid size in bytes, cannot be negative: {size_bytes}")
     if base not in _BYTES_UNIT_NAMES:
-        raise ValueError(f'invalid bytes base number: {repr(base)} must be one of: {sorted(_BYTES_UNIT_NAMES.keys())}')
+        raise ValueError(
+            f"invalid bytes base number: {repr(base)} must be one of: {sorted(_BYTES_UNIT_NAMES.keys())}"
+        )
     units = _BYTES_UNIT_NAMES[base]
 
     # 1. compute power
@@ -125,27 +165,15 @@ def fmt_bytes_to_human(
     # obtain the actual unit strings
     unit = units[i]
     if fmt_use_colors_get(use_colors):
-        unit = f'{_BYTES_UNIT_COLORS[i]}{unit}{c.RST}'
+        unit = f"{_BYTES_UNIT_COLORS[i]}{unit}{c.RST}"
 
     # format string
     if align:
         lpad = _BYTES_BASE_PADDING[base]
         rpad = _BYTES_UNIT_PADDING[base]
-        return f"{size_fmt:>{lpad+decimals}.{decimals}f} {unit:<{rpad}s}"
+        return f"{size_fmt:>{lpad + decimals}.{decimals}f} {unit:<{rpad}s}"
     else:
         return f"{size_fmt:.{decimals}f} {unit}"
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    'fmt_use_colors_set_default',
-    'fmt_use_colors_get',
-    'fmt_bytes_to_human',
-)
 
 
 # ========================================================================= #

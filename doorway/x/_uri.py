@@ -22,21 +22,45 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
+
+__all__ = (
+    # errors
+    "UriMalformedException",
+    "UriIsIncorrectTypeError",
+    # enums
+    "UriValMode",
+    "UriTypeEnum",
+    # validation
+    "UriFieldValidator",
+    "UriValidator",
+    "UriValidatorUrl",
+    "UriValidatorFile",
+    # functional
+    "uri_parse",
+    "uri_validate",
+    "uri_extract",
+    # oop
+    "Uri",
+)
+
+
 import logging
 import os
 from contextlib import contextmanager
 from enum import Enum
 from functools import wraps
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import NoReturn
-from typing import Optional
-from typing import Sequence
-from typing import Tuple
-from typing import TypeVar
-from typing import Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from rfc3986 import normalizers
 from rfc3986 import ParseResult
@@ -54,7 +78,9 @@ _ORIG_REMOVE_DOT_SEGMENTS = normalizers.remove_dot_segments
 
 
 @contextmanager
-def _rfc3986_patch_context__remove_dot_segments(disabled=False):
+def _rfc3986_patch_context__remove_dot_segments(
+    disabled: bool = False,
+) -> Iterator[None]:
     # set new function, this no longer matches: http://tools.ietf.org/html/rfc3986#section-5.2.4
     # -- make sure that '..' and '.' at the start of a path are not removed!
     # -- '' might become '.' which should actually not be allowed!
@@ -75,19 +101,19 @@ def _rfc3986_patch_context__remove_dot_segments(disabled=False):
 
 class UriMalformedException(Exception):
     def __init__(self, parsed: ParseResult, msg: str):
-        super().__init__(f'[Malformed URI]: {msg} -- From URI: {parsed.unsplit()}')
+        super().__init__(f"[Malformed URI]: {msg} -- From URI: {parsed.unsplit()}")
 
 
-class EnumValMode(Enum):
-    OPTIONAL = 'OPTIONAL'
-    REQUIRED = 'REQUIRED'
-    FORBIDDEN = 'FORBIDDEN'
+class UriValMode(Enum):
+    OPTIONAL = "OPTIONAL"
+    REQUIRED = "REQUIRED"
+    FORBIDDEN = "FORBIDDEN"
 
 
-class UriFieldValidator(object):
+class UriFieldValidator:
     def __init__(
         self,
-        mode: EnumValMode = EnumValMode.OPTIONAL,
+        mode: UriValMode = UriValMode.OPTIONAL,
         validator: Callable[[ParseResult, str, str, Any], ParseResult] = None,
         one_of: Optional[Sequence[Any]] = None,
     ):
@@ -95,34 +121,45 @@ class UriFieldValidator(object):
         self._validator = validator
         self._one_of = one_of
 
-    def __call__(self, parsed: ParseResult, uri_kind: str, field_name: str, field_value: Any) -> NoReturn:
+    def __call__(
+        self, parsed: ParseResult, uri_kind: str, field_name: str, field_value: Any
+    ) -> None:
         # validate based on the mode
-        if self._mode == EnumValMode.REQUIRED:
+        if self._mode == UriValMode.REQUIRED:
             if not field_value:
-                raise UriMalformedException(parsed, f'field {repr(field_name)} is required, but got value: {repr(field_value)}')
-        elif self._mode == EnumValMode.FORBIDDEN:
+                raise UriMalformedException(
+                    parsed,
+                    f"field {repr(field_name)} is required, but got value: {repr(field_value)}",
+                )
+        elif self._mode == UriValMode.FORBIDDEN:
             if field_value:
-                raise UriMalformedException(parsed, f'field {repr(field_name)} is forbidden, but got value: {repr(field_value)}')
-        elif self._mode != EnumValMode.OPTIONAL:
-            raise NotImplementedError('This should never happen!')
+                raise UriMalformedException(
+                    parsed,
+                    f"field {repr(field_name)} is forbidden, but got value: {repr(field_value)}",
+                )
+        elif self._mode != UriValMode.OPTIONAL:
+            raise NotImplementedError("This should never happen!")
         # validate based on required values
         if self._one_of is not None:
             if field_value not in self._one_of:
-                raise UriMalformedException(parsed, f'field {repr(field_name)} has value: {repr(field_value)}, but must be one of: {list(self._one_of)}')
+                raise UriMalformedException(
+                    parsed,
+                    f"field {repr(field_name)} has value: {repr(field_value)}, but must be one of: {list(self._one_of)}",
+                )
         # validate based on the validator function
         if self._validator is not None:
             self._validator(parsed, uri_kind, field_name, field_value)
 
 
-class UriValidator(object):
+class UriValidator:
     # override these in subclasses
-    validate_scheme:   UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_host:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_port:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_path:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_query:    UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_fragment: UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_scheme: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_host: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_port: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_path: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_query: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_fragment: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
 
     def __call__(self, uri: Union[str, Path]) -> ParseResult:
         return self.validate(uri)
@@ -130,13 +167,48 @@ class UriValidator(object):
     def validate(self, uri: Union[str, Path]) -> ParseResult:
         parsed = uri_parse(uri)
         # validate everything
-        self.validate_scheme  (parsed=parsed, uri_kind=self.uri_kind, field_name='scheme',   field_value=parsed.scheme)
-        self.validate_userinfo(parsed=parsed, uri_kind=self.uri_kind, field_name='userinfo', field_value=parsed.userinfo)
-        self.validate_host    (parsed=parsed, uri_kind=self.uri_kind, field_name='host',     field_value=parsed.host)
-        self.validate_port    (parsed=parsed, uri_kind=self.uri_kind, field_name='port',     field_value=parsed.port)
-        self.validate_path    (parsed=parsed, uri_kind=self.uri_kind, field_name='path',     field_value=parsed.path)
-        self.validate_query   (parsed=parsed, uri_kind=self.uri_kind, field_name='query',    field_value=parsed.query)
-        self.validate_fragment(parsed=parsed, uri_kind=self.uri_kind, field_name='fragment', field_value=parsed.fragment)
+        self.validate_scheme(
+            parsed=parsed,
+            uri_kind=self.uri_kind,
+            field_name="scheme",
+            field_value=parsed.scheme,
+        )
+        self.validate_userinfo(
+            parsed=parsed,
+            uri_kind=self.uri_kind,
+            field_name="userinfo",
+            field_value=parsed.userinfo,
+        )
+        self.validate_host(
+            parsed=parsed,
+            uri_kind=self.uri_kind,
+            field_name="host",
+            field_value=parsed.host,
+        )
+        self.validate_port(
+            parsed=parsed,
+            uri_kind=self.uri_kind,
+            field_name="port",
+            field_value=parsed.port,
+        )
+        self.validate_path(
+            parsed=parsed,
+            uri_kind=self.uri_kind,
+            field_name="path",
+            field_value=parsed.path,
+        )
+        self.validate_query(
+            parsed=parsed,
+            uri_kind=self.uri_kind,
+            field_name="query",
+            field_value=parsed.query,
+        )
+        self.validate_fragment(
+            parsed=parsed,
+            uri_kind=self.uri_kind,
+            field_name="fragment",
+            field_value=parsed.fragment,
+        )
         # final result
         return parsed
 
@@ -147,7 +219,7 @@ class UriValidator(object):
         raise NotImplementedError
 
     @property
-    def uri_type(self) -> 'EnumUriType':
+    def uri_type(self) -> "UriTypeEnum":
         raise NotImplementedError
 
     @property
@@ -168,29 +240,32 @@ class UriValidator(object):
 # without `str` as a parent class, this does not evaluate to `True`.
 # -- HOWEVER: we do not want this feature! It will just cause confusion
 #             and can't be type checked!
-class EnumUriType(Enum):
+class UriTypeEnum(Enum):
     """
     Types of URIs supported by the `parse_uri_and_type` function.
     """
-    FILE = 'FILE'
-    URL = 'URL'
-    S3 = 'S3'
-    SSH = 'SSH'
+
+    FILE = "FILE"
+    URL = "URL"
+    S3 = "S3"
+    SSH = "SSH"
 
 
 class UriValidatorUrl(UriValidator):
-    uri_kind = 'url'
-    uri_type = EnumUriType.URL
-    allowed_schemes = ('http', 'https')
+    uri_kind = "url"
+    uri_type = UriTypeEnum.URL
+    allowed_schemes = ("http", "https")
 
     # override these in subclasses
-    validate_scheme:   UriFieldValidator = UriFieldValidator(mode=EnumValMode.REQUIRED, one_of=allowed_schemes)
-    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
-    validate_host:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.REQUIRED)
-    validate_port:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_path:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_query:    UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
-    validate_fragment: UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL)
+    validate_scheme: UriFieldValidator = UriFieldValidator(
+        mode=UriValMode.REQUIRED, one_of=allowed_schemes
+    )
+    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
+    validate_host: UriFieldValidator = UriFieldValidator(mode=UriValMode.REQUIRED)
+    validate_port: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_path: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_query: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
+    validate_fragment: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
 
     @classmethod
     def extract(cls, validated: ParseResult) -> str:
@@ -198,18 +273,20 @@ class UriValidatorUrl(UriValidator):
 
 
 class UriValidatorFile(UriValidator):
-    uri_kind = 'file'
-    uri_type = EnumUriType.FILE
-    allowed_schemes = ('file', None)
+    uri_kind = "file"
+    uri_type = UriTypeEnum.FILE
+    allowed_schemes = ("file", None)
 
     # override these in subclasses
-    validate_scheme:   UriFieldValidator = UriFieldValidator(mode=EnumValMode.OPTIONAL, one_of=allowed_schemes)
-    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
-    validate_host:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
-    validate_port:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
-    validate_path:     UriFieldValidator = UriFieldValidator(mode=EnumValMode.REQUIRED)
-    validate_query:    UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
-    validate_fragment: UriFieldValidator = UriFieldValidator(mode=EnumValMode.FORBIDDEN)
+    validate_scheme: UriFieldValidator = UriFieldValidator(
+        mode=UriValMode.OPTIONAL, one_of=allowed_schemes
+    )
+    validate_userinfo: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
+    validate_host: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
+    validate_port: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
+    validate_path: UriFieldValidator = UriFieldValidator(mode=UriValMode.REQUIRED)
+    validate_query: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
+    validate_fragment: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
 
     @classmethod
     def extract(cls, validated: ParseResult) -> str:
@@ -233,23 +310,31 @@ _SCHEME_VALIDATORS: Dict[Optional[str], UriValidator] = {
 # ========================================================================= #
 
 
-def uri_parse(uri: Union[str, Path, ParseResult], rfc3986_norm: bool = False) -> ParseResult:
+def uri_parse(
+    uri: Union[str, Path, ParseResult], rfc3986_norm: bool = False
+) -> ParseResult:
     parsed = uri
     # convert to parse result
     # -- assume already normalized if already a ParseResult
     if not isinstance(parsed, ParseResult):
         with _rfc3986_patch_context__remove_dot_segments(disabled=rfc3986_norm):
-            parsed: ParseResult = ParseResult.from_string(str(parsed), lazy_normalize=False)
+            parsed: ParseResult = ParseResult.from_string(
+                str(parsed), lazy_normalize=False
+            )
     # done!
     return parsed
 
 
-def uri_validate(uri: Union[str, Path], return_validator: bool = False) -> Union[ParseResult, Tuple[ParseResult, UriValidator]]:
+def uri_validate(
+    uri: Union[str, Path], return_validator: bool = False
+) -> Union[ParseResult, Tuple[ParseResult, UriValidator]]:
     parsed = uri_parse(uri)
     # get the validator
     validator = _SCHEME_VALIDATORS.get(parsed.scheme, None)
     if validator is None:
-        raise KeyError(f'invalid uri scheme: {repr(parsed.scheme)}, must be one of: {list(_SCHEME_VALIDATORS.keys())}, for uri: {repr(parsed.geturl())}')
+        raise KeyError(
+            f"invalid uri scheme: {repr(parsed.scheme)}, must be one of: {list(_SCHEME_VALIDATORS.keys())}, for uri: {repr(parsed.geturl())}"
+        )
     # validate the uri
     validated = validator.validate(parsed)
     # get results
@@ -262,7 +347,12 @@ def uri_extract(
     uri: Union[str, Path],
     return_validated: bool = False,
     return_validator: bool = False,
-) -> Union[str, Tuple[str, ParseResult], Tuple[str, UriValidator], Tuple[str, ParseResult, UriValidator]]:
+) -> Union[
+    str,
+    Tuple[str, ParseResult],
+    Tuple[str, UriValidator],
+    Tuple[str, ParseResult, UriValidator],
+]:
     validated, validator = uri_validate(uri, return_validator=True)
     # validate the uri
     uri_norm = validator.extract(validated)
@@ -271,8 +361,10 @@ def uri_extract(
         return uri_norm
     # return all the results
     results = [uri_norm]
-    if return_validated: results.append(validated)
-    if return_validator: results.append(validator)
+    if return_validated:
+        results.append(validated)
+    if return_validator:
+        results.append(validator)
     return tuple(results)
 
 
@@ -281,7 +373,7 @@ def uri_extract(
 # ========================================================================= #
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class UriIsIncorrectTypeError(Exception):
@@ -290,14 +382,18 @@ class UriIsIncorrectTypeError(Exception):
     """
 
 
-def only_if(prop: property) -> Callable[[T], T]:
+def _only_if(prop: property) -> Callable[[T], T]:
     def decorator(func: T) -> T:
         @wraps(func)
-        def wrapper(self: 'Uri', *args, **kwargs):
+        def wrapper(self: "Uri", *args, **kwargs):
             if getattr(self, prop.fget.__name__):
-                raise UriIsIncorrectTypeError(f'Check if: `{prop.fget.__name__}` is `True` before calling `{func.__name__}`, got uri: {repr(self.uri)}')
+                raise UriIsIncorrectTypeError(
+                    f"Check if: `{prop.fget.__name__}` is `True` before calling `{func.__name__}`, got uri: {repr(self.uri)}"
+                )
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -307,8 +403,7 @@ def only_if(prop: property) -> Callable[[T], T]:
 
 
 class Uri(object):
-
-    def __init__(self, uri: Union[str, Path, ParseResult, 'Uri']):
+    def __init__(self, uri: Union[str, Path, ParseResult, "Uri"]):
         # unwrap uri object
         if isinstance(uri, Uri):
             uri = uri._input_uri
@@ -327,7 +422,7 @@ class Uri(object):
         return self._validator.extract(self._validated)
 
     @property
-    def uri_type(self) -> EnumUriType:
+    def uri_type(self) -> UriTypeEnum:
         return self._validator.uri_type
 
     @property
@@ -343,7 +438,7 @@ class Uri(object):
         return self._validated.geturl()
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(uri={repr(self._input_uri)})'
+        return f"{self.__class__.__name__}(uri={repr(self._input_uri)})"
 
     def __str__(self):
         return self.uri
@@ -352,20 +447,20 @@ class Uri(object):
 
     @property
     def is_file(self) -> bool:
-        return self.uri_type == EnumUriType.FILE
+        return self.uri_type == UriTypeEnum.FILE
 
     @property
-    @only_if(is_file)
+    @_only_if(is_file)
     def file(self) -> str:
         return self.uri_extract
 
     @property
-    @only_if(is_file)
+    @_only_if(is_file)
     def file_abs(self) -> str:
         return os.path.abspath(self.uri_extract)
 
     @property
-    @only_if(is_file)
+    @_only_if(is_file)
     def file_is_abs(self) -> bool:
         return os.path.isabs(self.uri_extract)
 
@@ -373,28 +468,28 @@ class Uri(object):
 
     @property
     def is_url(self) -> bool:
-        return self.uri_type == EnumUriType.URL
+        return self.uri_type == UriTypeEnum.URL
 
     @property
-    @only_if(is_url)
+    @_only_if(is_url)
     def url(self) -> str:
         return self.uri_extract
 
     @property
-    @only_if(is_url)
+    @_only_if(is_url)
     def url_is_http(self) -> bool:
-        return self.uri_parsed.scheme == 'http'
+        return self.uri_parsed.scheme == "http"
 
     @property
-    @only_if(is_url)
+    @_only_if(is_url)
     def url_is_https(self) -> bool:
-        return self.uri_parsed.scheme == 'https'
+        return self.uri_parsed.scheme == "https"
 
     # ~=~=~ S3 ~=~=~ #
 
     @property
     def is_s3(self) -> bool:
-        return self.uri_type == EnumUriType.S3
+        return self.uri_type == UriTypeEnum.S3
 
     # TODO ...
 
@@ -402,7 +497,7 @@ class Uri(object):
 
     @property
     def is_ssh(self) -> bool:
-        return self.uri_type == EnumUriType.SSH
+        return self.uri_type == UriTypeEnum.SSH
 
     # TODO ...
 
@@ -416,32 +511,6 @@ class Uri(object):
     #
     # def retrieve(self, dst: Union[str, Path, 'Uri']):
     #     raise NotImplementedError
-
-
-# ========================================================================= #
-# export                                                                    #
-# ========================================================================= #
-
-
-__all__ = (
-    # errors
-    'UriMalformedException',
-    'UriIsIncorrectTypeError',
-    # enums
-    'EnumValMode',
-    'EnumUriType',
-    # validation
-    'UriFieldValidator',
-    'UriValidator',
-    'UriValidatorUrl',
-    'UriValidatorFile',
-    # functional
-    'uri_parse',
-    'uri_validate',
-    'uri_extract',
-    # oop
-    'Uri',
-)
 
 
 # ========================================================================= #

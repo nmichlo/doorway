@@ -22,5 +22,70 @@
 #  SOFTWARE.
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 
-from doorway.x._uri import *
-from doorway.x._proxy import *
+from doorway.x._uri import (
+    UriMalformedException,
+    UriIsIncorrectTypeError,
+    UriValMode,
+    UriTypeEnum,
+    UriFieldValidator,
+    UriValidator,
+    UriValidatorUrl,
+    UriValidatorFile,
+    uri_parse,
+    uri_validate,
+    uri_extract,
+    Uri,
+)
+from doorway.x._proxy import (
+    proxies_set_default_scraper,
+    proxies_register_scraper,
+    proxies_scrape,
+    ProxiesRunOutError,
+    ProxyMalformedError,
+    ProxyDownloadFailedError,
+    ProxyRegisteredScraperHint,
+    ProxyTypeHint,
+    ProxyDictHint,
+    ProxyScrapeFnHint,
+    proxy_download,
+    ProxyDownloader,
+)
+
+__all__ = [
+    # ===== proxy ===== #
+    # proxy scraper registration
+    "proxies_set_default_scraper",
+    "proxies_register_scraper",
+    "proxies_scrape",
+    # errors
+    "ProxiesRunOutError",
+    "ProxyMalformedError",
+    "ProxyDownloadFailedError",
+    # hints
+    "ProxyRegisteredScraperHint",
+    "ProxyTypeHint",
+    "ProxyDictHint",
+    "ProxyScrapeFnHint",
+    # helpers
+    "proxy_download",
+    # main api
+    "ProxyDownloader",
+    # ===== uri ===== #
+    # errors
+    "UriMalformedException",
+    "UriIsIncorrectTypeError",
+    # enums
+    "UriValMode",
+    "UriTypeEnum",
+    # validation
+    "UriFieldValidator",
+    "UriValidator",
+    "UriValidatorUrl",
+    "UriValidatorFile",
+    # functional
+    "uri_parse",
+    "uri_validate",
+    "uri_extract",
+    # oop
+    "Uri",
+]
