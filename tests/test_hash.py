@@ -519,37 +519,19 @@ def test_hash_file_validate():
         ):
             doorway.hash_file_validate(fp.name, hash={}, hash_algo="md5")
         # check is valid
-        assert (
-            doorway.hash_file_is_valid(fp.name, hash=hashs_md5, hash_missing=False)
-            == True
+        assert doorway.hash_file_is_valid(fp.name, hash=hashs_md5, hash_missing=False)
+        assert doorway.hash_file_is_valid(
+            fp.name, hash=hashs_md5["fast"], hash_missing=False
         )
-        assert (
-            doorway.hash_file_is_valid(
-                fp.name, hash=hashs_md5["fast"], hash_missing=False
-            )
-            == True
+        assert not doorway.hash_file_is_valid(
+            fp.name, hash=hashs_md5["full"], hash_missing=False
         )
-        assert (
-            doorway.hash_file_is_valid(
-                fp.name, hash=hashs_md5["full"], hash_missing=False
-            )
-            == False
+        assert doorway.hash_file_is_valid(fp.name, hash=hashs_md5, hash_missing=True)
+        assert doorway.hash_file_is_valid(
+            fp.name, hash=hashs_md5["fast"], hash_missing=True
         )
-        assert (
-            doorway.hash_file_is_valid(fp.name, hash=hashs_md5, hash_missing=True)
-            == True
-        )
-        assert (
-            doorway.hash_file_is_valid(
-                fp.name, hash=hashs_md5["fast"], hash_missing=True
-            )
-            == True
-        )
-        assert (
-            doorway.hash_file_is_valid(
-                fp.name, hash=hashs_md5["full"], hash_missing=True
-            )
-            == False
+        assert not doorway.hash_file_is_valid(
+            fp.name, hash=hashs_md5["full"], hash_missing=True
         )
     # missing file
     with pytest.raises(
@@ -566,16 +548,12 @@ def test_hash_file_validate():
         FileNotFoundError, match="could not compute hash for missing file:"
     ):
         doorway.hash_file_is_valid(fp.name, hash=hashs_md5, hash_missing=False)
-    assert (
-        doorway.hash_file_is_valid(fp.name, hash=hashs_md5, hash_missing=True) == False
+    assert not doorway.hash_file_is_valid(fp.name, hash=hashs_md5, hash_missing=True)
+    assert not doorway.hash_file_is_valid(
+        fp.name, hash=hashs_md5["fast"], hash_missing=True
     )
-    assert (
-        doorway.hash_file_is_valid(fp.name, hash=hashs_md5["fast"], hash_missing=True)
-        == False
-    )
-    assert (
-        doorway.hash_file_is_valid(fp.name, hash=hashs_md5["full"], hash_missing=True)
-        == False
+    assert not doorway.hash_file_is_valid(
+        fp.name, hash=hashs_md5["full"], hash_missing=True
     )
 
 
