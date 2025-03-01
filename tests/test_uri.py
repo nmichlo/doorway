@@ -24,18 +24,15 @@
 
 import pytest
 
-from doorway.x._uri import UriMalformedException
-from doorway.x._uri import UriTypeEnum
-from doorway.x._uri import uri_parse
-from doorway.x._uri import uri_validate
-
-
 # ========================================================================= #
 # TEST UTILS                                                                #
 # ========================================================================= #
 
 
+@pytest.mark.extra_test
 def test_uri_type_enum():
+    from doorway.x._uri import UriTypeEnum
+
     assert len(UriTypeEnum) == 4
     assert list(UriTypeEnum) == [
         UriTypeEnum.FILE,
@@ -65,7 +62,11 @@ def test_uri_type_enum():
     assert UriTypeEnum.URL.name == UriTypeEnum.URL.value
 
 
+@pytest.mark.extra_test
 def test_filename_from_uri():
+    from doorway.x._uri import UriMalformedException
+    from doorway.x._uri import uri_validate
+
     # test paths
     uri_validate("basename")
     uri_validate("basename.ext")
@@ -116,7 +117,10 @@ def test_filename_from_uri():
     uri_validate("http://basename.ext/suffix#fragment?query")
 
 
+@pytest.mark.extra_test
 def test_uri_paths_alt():
+    from doorway.x._uri import uri_parse
+
     def uri(inp, targ=None):
         targ = inp if (targ is None) else targ
         assert uri_parse(inp).geturl() == targ
