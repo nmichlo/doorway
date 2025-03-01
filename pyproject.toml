@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "rfc3986>=1",
+    # no deps!
 ]
 
 [project.optional-dependencies]
@@ -47,6 +47,7 @@ test = [
 ]
 
 extra = [
+    "rfc3986>=1",
     "requests",
     "cachier",
     "tqdm",

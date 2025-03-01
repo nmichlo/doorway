@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import BinaryIO
 from typing import TextIO
 from typing import Union
+from uuid import uuid4
 
 from doorway._modify_path import path_basename_modify
 
@@ -120,8 +121,6 @@ class AtomicPath(object):
             )
 
         # get the actual files
-        from uuid import uuid4
-
         self._dst_path = Path(file).absolute()
         self._tmp_path = path_basename_modify(
             file=self._dst_path,

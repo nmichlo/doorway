@@ -42,15 +42,20 @@ __all__ = [
     "ProxyDownloader",
 ]
 
+import io
 import os
+from collections import defaultdict
 from logging import getLogger
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
+from random import Random
 from typing import Callable, Iterable, Literal, TYPE_CHECKING, TypedDict, TypeVar, Union
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
 from typing import Tuple
+import urllib.request
 
 from doorway import EnvVar
 
@@ -151,7 +156,14 @@ def proxies_scrape(
         )
     # wrap the function
     if cached:
-        from cachier import cachier
+        try:
+            from cachier import cachier
+        except ImportError as e:
+            raise ImportError(
+                "To use the 'cached' feature, you must install cachier."
+                "You can install it via: `pip install cachier`"
+            ) from e
+
         from datetime import timedelta
 
         proxy_scrape_fn = cachier(
@@ -175,7 +187,13 @@ def _requests_get(
     fake_user_agent: bool = True,
     params: Optional[dict] = None,
 ) -> "requests.Response":
-    import requests
+    try:
+        import requests
+    except ImportError as e:
+        raise ImportError(
+            "To use the 'requests' library, you must install it."
+            "You can install it via: `pip install requests`"
+        ) from e
 
     # fake a request from a browser
     return requests.get(
@@ -270,7 +288,8 @@ def _scrape_proxies_freeproxieslist(proxy_type: ProxyTypeHint) -> List[Dict[str,
         from bs4 import BeautifulSoup
     except ImportError as e:
         raise ImportError(
-            "BeautifulSoup `bs4` is not installed, cannot scrape proxies!"
+            "To use the 'free-proxy-list.net' scraper, you must install bs4."
+            "You can install it via: `pip install beautifulsoup4`"
         ) from e
 
     page = _requests_get("https://free-proxy-list.net/", fake_user_agent=True)
@@ -329,8 +348,6 @@ class ProxyDownloadFailedError(Exception):
 
 
 def _make_proxy_opener(proxy: ProxyDictHint):
-    import urllib.request
-
     if len(proxy) != 1:
         raise ProxyMalformedError(
             f"proxy dictionaries should only have one entry, the key is the protocol, and the value is the url... invalid: {proxy}"
@@ -347,8 +364,6 @@ def proxy_download(
     proxy: ProxyDictHint,
     timeout: Optional[float] = 8,
 ):
-    import io
-
     # TODO: should use AtomicOpen
     data = _make_proxy_opener(proxy=proxy).open(url, timeout=timeout).read()
     # download to temp file in case there is an error
@@ -422,9 +437,6 @@ class ProxyDownloader:
         req_min_remove_count: int = 5,
         req_max_fail_ratio: float = 0.5,
     ):
-        from collections import defaultdict
-        from random import Random
-
         # default proxy scraping
         if proxies is None:
             proxies = proxies_scrape()
@@ -477,8 +489,13 @@ class ProxyDownloader:
         attempts: int = 128,
         timeout: int = 8,
     ):
-        from multiprocessing.pool import ThreadPool
-        from tqdm import tqdm
+        try:
+            from tqdm import tqdm
+        except ImportError:
+            raise ImportError(
+                "To use the download_threaded function, you must install tqdm."
+                "You can install it via: `pip install tqdm`"
+            )
 
         # check inputs
         try:

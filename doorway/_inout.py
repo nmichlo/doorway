@@ -54,16 +54,17 @@ def io_download(
     # make sure we have the correct imports
     try:
         import requests
-    except ImportError as e:
+    except ImportError:
         raise ImportError(
-            f"`requests` need to be installed for `{io_download.__name__}`"
-        ) from e
+            "The `requests` package is required for downloading files.\n"
+            "You can install it via: `pip install requests`."
+        )
 
     try:
         from tqdm import tqdm
     except ImportError:
         warnings.warn(
-            f"`tqdm` is not installed, progress bar will not be shown for `{io_download.__name__}`"
+            "The `tqdm` package is not installed, progress bar will not be shown.\n"
         )
         tqdm = None
         progress = False

@@ -62,8 +62,14 @@ from typing import (
     Union,
 )
 
-from rfc3986 import normalizers
-from rfc3986 import ParseResult
+try:
+    from rfc3986 import normalizers
+    from rfc3986 import ParseResult
+except ImportError:
+    raise ImportError(
+        "The `rfc3986` package is required for this module. "
+        "You can install it via: `pip install rfc3986`."
+    )
 
 
 LOG = logging.getLogger(__name__)
