@@ -2,7 +2,7 @@
 <p align="center">
     <h1 align="center">🚪 Doorway</h1>
     <p align="center">
-        <i>Essential utilities for working with files</i>
+        <i>Essential data wrangling utilities.</i>
     </p>
 </p>
 
@@ -41,9 +41,11 @@
 
 ## Overview
 
-Doorway is a common library for interacting with files.
+Doorway is a common library for interacting with files and data wranging, with zero deps over the common utils.
 
 Get started with `doorway` by installing it with $`pip install doorway` or cloning this repository.
+
+Experimental features need `pip install "doorway[extras]"`
 
 ## Features
 
