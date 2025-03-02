@@ -312,6 +312,27 @@ failed = downloader.download_threaded(
 )
 ```
 
+#### Proxy Issues?
+
+The scrape logic used to obtain the proxy list will  probably go out of date. You can override
+the *default* scrape logic by registering a new scrape function.
+
+```python3
+from doorway.x import proxies_register_scraper
+
+@proxies_register_scraper(name='my_proxy_source', is_default=True)
+def custom_proxy_scraper(proxy_type):
+    # you should respect this setting
+    assert proxy_type in ('all', 'http', 'https')
+    # proxies is a list of dictionaries, where each dictionary only has one entry:
+    # - the key is the protocol
+    # - the value is the matching full url
+    return [
+        {'HTTP': 'http://<my-http-proxy>.com'},
+        {'HTTPS': 'https://<my-https-proxy>.com'},
+    ]
+```
+
 ### URI Handling
 
 Interop between URIs from different locations, e.g. S3, Local, HTTP, etc.
