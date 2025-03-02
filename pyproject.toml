@@ -46,7 +46,7 @@ test = [
     "pytest-cov>=2",
 ]
 
-extra = [
+extras = [
     "rfc3986>=1",
     "requests",
     "cachier",
