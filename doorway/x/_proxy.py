@@ -137,7 +137,7 @@ def proxies_register_scraper(
 
 
 def proxies_scrape(
-    source: Optional[str] = ProxyRegisteredScraperHint,
+    source: Optional[ProxyRegisteredScraperHint] = None,
     proxy_type: ProxyTypeHint = "all",
     cache_dir: str = "data/proxies/cachier",
     cached: bool = True,
