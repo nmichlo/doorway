@@ -49,13 +49,13 @@ from collections import defaultdict
 from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Sequence
+from collections.abc import Sized
 from logging import getLogger
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from random import Random
 from typing import TYPE_CHECKING
 from typing import Literal
-from typing import TypedDict
 
 from doorway import EnvVar
 
@@ -71,17 +71,10 @@ if TYPE_CHECKING:
 # ============================================================================ #
 
 
-class HTTPProxyHint(TypedDict):
-    HTTP: str
-
-
-class HTTPSProxyHint(TypedDict):
-    HTTPS: str
-
-
 ProxyRegisteredScraperHint = str
 ProxyTypeHint = Literal["http", "https", "all"]
-type ProxyDictHint = HTTPProxyHint | HTTPSProxyHint
+# a proxy is a single-entry dict, mapping an uppercased protocol (eg. `HTTP`/`HTTPS`) to its url
+type ProxyDictHint = dict[str, str]
 ProxyScrapeFnHint = Callable[[ProxyTypeHint], list[ProxyDictHint]]
 
 
@@ -473,13 +466,10 @@ class ProxyDownloader:
                 "You can install it via: `pip install tqdm`"
             )
 
-        # check inputs
-        try:
-            total = len(url_file_tuples)
-            if total <= 0:
-                return []
-        except TypeError:
-            total = None
+        # check inputs, if possible -- not all iterables (eg. generators) support `len`
+        total = len(url_file_tuples) if isinstance(url_file_tuples, Sized) else None
+        if total is not None and total <= 0:
+            return []
 
         def download(url_file):
             url, file = url_file

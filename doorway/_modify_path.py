@@ -30,6 +30,7 @@ __all__ = [
 
 
 from pathlib import Path
+from typing import overload
 
 # ========================================================================= #
 # Basename formatting                                                       #
@@ -87,6 +88,26 @@ def basename_modify(
 # ========================================================================= #
 
 
+@overload
+def path_basename_modify(
+    file: str,
+    ext: str | None = None,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    basename_prefix: str | None = None,
+    basename_suffix: str | None = None,
+    name_contains_sep: bool = True,
+) -> str: ...
+@overload
+def path_basename_modify(
+    file: Path,
+    ext: str | None = None,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    basename_prefix: str | None = None,
+    basename_suffix: str | None = None,
+    name_contains_sep: bool = True,
+) -> Path: ...
 def path_basename_modify(
     file: str | Path,
     ext: str | None = None,

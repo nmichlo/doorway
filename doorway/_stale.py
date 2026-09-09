@@ -32,6 +32,7 @@ __all__ = [
 import logging
 from collections.abc import Callable
 from functools import wraps
+from typing import overload
 
 from doorway._hash import HashAlgo
 from doorway._hash import Hashes
@@ -105,6 +106,23 @@ def stalefile_generate(
     return path
 
 
+@overload
+def stalefile_decorator(
+    path: str,
+    hash: Hashes,
+    hash_mode: HashMode | None = None,
+    hash_algo: HashAlgo | None = None,
+    make_file_fn: None = None,
+) -> Callable[[Callable[[HashPath], None]], Callable[[], HashPath]]: ...
+@overload
+def stalefile_decorator(
+    path: str,
+    hash: Hashes,
+    hash_mode: HashMode | None = None,
+    hash_algo: HashAlgo | None = None,
+    *,
+    make_file_fn: Callable[[HashPath], None],
+) -> Callable[[], HashPath]: ...
 def stalefile_decorator(
     path: str,
     hash: Hashes,
@@ -176,7 +194,9 @@ class Stalefile:
             hash_algo=self._hash_algo,
         )
 
-    def decorator(self, make_file_fn: Callable[[HashPath], None] | None = None) -> Callable[[], HashPath]:
+    def decorator(
+        self, make_file_fn: Callable[[HashPath], None] | None = None
+    ) -> Callable[[Callable[[HashPath], None]], Callable[[], HashPath]] | Callable[[], HashPath]:
         # the wrapped function should take in a path and produce a file at that location.
         # a. if the file already exists, this function is not called!
         # b. if the file does not exist, the function is called to generate the file, which is then validated!

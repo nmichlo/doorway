@@ -35,6 +35,7 @@ from collections.abc import Callable
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Literal
+from typing import overload
 
 from doorway._hash import Hash
 from doorway._hash import HashAlgo
@@ -45,7 +46,7 @@ from doorway._hash import hash_str
 # ========================================================================= #
 
 
-_SHARD_KEYS = {
+_SHARD_KEYS: dict[str, Callable[[str | Path], str | Path]] = {
     "basename": os.path.basename,
     "abspath": os.path.abspath,
     "input": lambda x: x,
@@ -60,25 +61,29 @@ def shard_hash[T](
     hash_algo: HashAlgo | None = None,
 ) -> Hash:
     # get the hash data function
+    key: str | Path | T
     if shard_key is None:
-        pass
-    elif callable(shard_key):
-        value = shard_key(value)
+        key = value
     elif isinstance(shard_key, str):
         fn = _SHARD_KEYS.get(shard_key, None)  # cannot be None here
         if fn is None:
             raise KeyError(
                 f"if shard_key is a str, it must be one of: {list(_SHARD_KEYS.keys())}, got: {repr(shard_key)}"
             )
-        value = fn(value)
+        assert isinstance(value, (str, Path)), (
+            f"The value must be a str or Path to use the preset shard_key {repr(shard_key)}, instead got type: {type(value)}, with value: {repr(value)}"
+        )
+        key = fn(value)
+    elif callable(shard_key):
+        key = shard_key(value)
     else:
         raise ValueError(f"shard_key must be a str, callable or None, got: {repr(shard_key)}")
     # get the string
-    assert isinstance(value, (str, Path)), (
-        f"The value after shard_key is applied must be a str or Path, instead got type: {type(value)}, with value: {repr(value)}"
+    assert isinstance(key, (str, Path)), (
+        f"The value after shard_key is applied must be a str or Path, instead got type: {type(key)}, with value: {repr(key)}"
     )
     # compute the hash
-    return hash_str(str(value), hash_algo=hash_algo)
+    return hash_str(str(key), hash_algo=hash_algo)
 
 
 def shard_idx[T](
@@ -101,19 +106,42 @@ def shard_idx[T](
 # ========================================================================= #
 
 
-_SHARD_RETURNS = {
-    "pairs": lambda i, value: (i, value),
-    "indices": lambda i, value: i,
-    "values": lambda i, value: value,
-}
+_SHARD_RETURN_MODES = ("pairs", "indices", "values")
 
 type _ShardsReturnHint[T] = (
-    list[tuple[int, T]]  # pairs
-    | list[int]  # indices
-    | list[T]  # values
+    list[list[tuple[int, T]]]  # pairs
+    | list[list[int]]  # indices
+    | list[list[T]]  # values
 )
 
 
+@overload
+def sharded[T](
+    values: Iterable[T],
+    num_shards: int,
+    *,
+    shard_key: ShardKey[T] = None,
+    hash_algo: HashAlgo | None = None,
+    returns: Literal["pairs"],
+) -> list[list[tuple[int, T]]]: ...
+@overload
+def sharded[T](
+    values: Iterable[T],
+    num_shards: int,
+    *,
+    shard_key: ShardKey[T] = None,
+    hash_algo: HashAlgo | None = None,
+    returns: Literal["indices"],
+) -> list[list[int]]: ...
+@overload
+def sharded[T](
+    values: Iterable[T],
+    num_shards: int,
+    *,
+    shard_key: ShardKey[T] = None,
+    hash_algo: HashAlgo | None = None,
+    returns: Literal["values"] = "values",
+) -> list[list[T]]: ...
 def sharded[T](
     values: Iterable[T],
     num_shards: int,
@@ -124,19 +152,39 @@ def sharded[T](
 ) -> _ShardsReturnHint[T]:
     """
     Shard files based on their hashes instead of random seeds
+
+    Returns a list of `num_shards` buckets, each holding the items assigned to that shard.
     """
-    # shard functions
-    if returns not in _SHARD_RETURNS:
-        raise KeyError(f"invalid shards returns: {repr(returns)}, must be one of: {sorted(_SHARD_RETURNS.keys())}")
-    value_getter = _SHARD_RETURNS[returns]
-    # create new array of shards
-    shards = [[] for _ in range(num_shards)]
-    # assign paths to shards
-    for i, value in enumerate(values):
-        idx = shard_idx(value, num_shards, shard_key=shard_key, hash_algo=hash_algo)
-        shards[idx].append(value_getter(i, value))
-    # results
-    return shards
+    if returns not in _SHARD_RETURN_MODES:
+        raise KeyError(f"invalid shards returns: {repr(returns)}, must be one of: {_SHARD_RETURN_MODES}")
+    # create new array of shards, and assign values to the correct shard
+    if returns == "pairs":
+        shards_pairs: list[list[tuple[int, T]]] = [[] for _ in range(num_shards)]
+        for i, value in enumerate(values):
+            idx = shard_idx(value, num_shards, shard_key=shard_key, hash_algo=hash_algo)
+            shards_pairs[idx].append((i, value))
+        return shards_pairs
+    elif returns == "indices":
+        shards_indices: list[list[int]] = [[] for _ in range(num_shards)]
+        for i, value in enumerate(values):
+            idx = shard_idx(value, num_shards, shard_key=shard_key, hash_algo=hash_algo)
+            shards_indices[idx].append(i)
+        return shards_indices
+    else:
+        shards_values: list[list[T]] = [[] for _ in range(num_shards)]
+        for value in values:
+            idx = shard_idx(value, num_shards, shard_key=shard_key, hash_algo=hash_algo)
+            shards_values[idx].append(value)
+        return shards_values
+
+
+def _group_shards[X](shards: list[list[X]], shard_weights: list[int]) -> list[list[X]]:
+    weighted_buckets: list[list[X]] = []
+    i = 0
+    for num_shards in shard_weights:
+        weighted_buckets.append([item for shard in shards[i : i + num_shards] for item in shard])
+        i += num_shards
+    return weighted_buckets
 
 
 def sharded_weighted[T](
@@ -157,21 +205,23 @@ def sharded_weighted[T](
     assert all(isinstance(size, int) and (size >= 0) for size in shard_weights), (
         f"values of group_sizes must be integers that are >= 0, got: {repr(shard_weights)}"
     )
-    # get all the shards
-    shards = sharded(
-        values=values,
-        num_shards=sum(shard_weights),
-        shard_key=shard_key,
-        hash_algo=hash_algo,
-        returns=returns,
-    )
-    # group all the shards together
-    weighted_buckets, i = [], 0
-    for num_shards in shard_weights:
-        weighted_buckets.append([item for shard in shards[i : i + num_shards] for item in shard])
-        i += num_shards
-    # done!
-    return weighted_buckets
+    num_shards = sum(shard_weights)
+    # get all the shards, then group them together based on the weights
+    if returns == "pairs":
+        shards_pairs: list[list[tuple[int, T]]] = sharded(
+            values=values, num_shards=num_shards, shard_key=shard_key, hash_algo=hash_algo, returns="pairs"
+        )
+        return _group_shards(shards_pairs, shard_weights)
+    elif returns == "indices":
+        shards_indices: list[list[int]] = sharded(
+            values=values, num_shards=num_shards, shard_key=shard_key, hash_algo=hash_algo, returns="indices"
+        )
+        return _group_shards(shards_indices, shard_weights)
+    else:
+        shards_values: list[list[T]] = sharded(
+            values=values, num_shards=num_shards, shard_key=shard_key, hash_algo=hash_algo, returns="values"
+        )
+        return _group_shards(shards_values, shard_weights)
 
 
 # ========================================================================= #

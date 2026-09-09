@@ -31,8 +31,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import BinaryIO
-from typing import TextIO
+from typing import IO
 from uuid import uuid4
 
 from doorway._modify_path import path_basename_modify
@@ -251,7 +250,7 @@ class AtomicOpen:
 
         # set the class vars
         self._open_mode = mode
-        self._file_io = None
+        self._file_io: IO[bytes] | IO[str] | None = None
         self._orig_path = file
 
         # handle the different basic modes
@@ -264,7 +263,7 @@ class AtomicOpen:
                 makedirs=makedirs,
             )
 
-    def __enter__(self) -> TextIO | BinaryIO:
+    def __enter__(self) -> IO[bytes] | IO[str]:
         # - we should be in read-only mode
         if self._atomic_path is None:
             tmp_path = self._orig_path
@@ -280,6 +279,7 @@ class AtomicOpen:
 
     def __exit__(self, error_type, error, traceback):
         # close the temp file
+        assert self._file_io is not None, "the file was not opened, this is a bug!"
         try:
             self._file_io.close()
         finally:

@@ -201,7 +201,7 @@ class HashError(Exception):
 
 
 def hash_norm(
-    hash: Hashes,
+    hash: object,
     hash_mode: HashMode | None = None,
     hash_algo: HashAlgo | None = None,
 ) -> Hash:
@@ -214,6 +214,11 @@ def hash_norm(
        1. `mode:algo`
        2. `mode`
        3. `algo`
+
+    `hash` is validated at runtime rather than by its type: it is expected to be a `Hashes`
+    (`str | dict[str, str]`), but callers may pass loosely-typed data (e.g. loaded from a
+    cache file on disk), so a `TypeError`/`KeyError` is raised here instead of relying on
+    static types to reject it.
     """
     if isinstance(hash, dict):
         hash_mode = hash_mode_get(hash_mode)

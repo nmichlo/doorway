@@ -35,6 +35,10 @@ import os
 from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from _typeshed import SupportsAllComparisons
 
 # ========================================================================= #
 # Types                                                                     #
@@ -169,8 +173,8 @@ class EnvVar[T]:
     # ===== static helpers ===== #
 
     @classmethod
-    def as_converter(cls, fn: EnvVarFnConverterHint[T]) -> EnvVarFnConverterHint[T]:
-        def _converter(value: str) -> T:
+    def as_converter[V](cls, fn: EnvVarFnConverterHint[V]) -> EnvVarFnConverterHint[V]:
+        def _converter(value: str) -> V:
             try:
                 return fn(value)
             except Exception as e:
@@ -215,8 +219,10 @@ class EnvVar[T]:
         return _validator
 
     @classmethod
-    def validator_min_max(cls, min_value: T | None, max_value: T | None) -> EnvVarFnValidatorHint[T]:
-        def _validator(value: T) -> T:
+    def validator_min_max[V: "SupportsAllComparisons"](
+        cls, min_value: V | None, max_value: V | None
+    ) -> EnvVarFnValidatorHint[V]:
+        def _validator(value: V) -> V:
             if min_value is not None and value < min_value:
                 raise EnvVarValidationError(f"value {repr(value)} must be greater than or equal to {min_value}")
             if max_value is not None and value > max_value:
@@ -235,10 +241,10 @@ class EnvVar[T]:
         default: str | None = None,
         validator: EnvVarFnValidatorHint[str] | None = None,
     ) -> "EnvVar[str]":
-        return cls(
+        return EnvVar(
             key=key,
             default=default,
-            converter=cls.as_converter(str),
+            converter=EnvVar.as_converter(str),
             validator=validator,
         )
 
@@ -250,10 +256,10 @@ class EnvVar[T]:
         default: int | None = None,
         validator: EnvVarFnValidatorHint[int] | None = None,
     ) -> "EnvVar[int]":
-        return cls(
+        return EnvVar(
             key=key,
             default=default,
-            converter=cls.as_converter(int),
+            converter=EnvVar.as_converter(int),
             validator=validator,
         )
 
@@ -265,10 +271,10 @@ class EnvVar[T]:
         default: float | None = None,
         validator: EnvVarFnValidatorHint[float] | None = None,
     ) -> "EnvVar[float]":
-        return cls(
+        return EnvVar(
             key=key,
             default=default,
-            converter=cls.as_converter(float),
+            converter=EnvVar.as_converter(float),
             validator=validator,
         )
 
@@ -297,7 +303,7 @@ class EnvVar[T]:
                     f"cannot convert environment variable `{key}={value}` into bool, must be one of: {sorted(list(convert_keys_true) + list(convert_keys_false))}"
                 )
 
-        return cls(
+        return EnvVar(
             key=key,
             default=default,
             converter=convert_bool,

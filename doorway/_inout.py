@@ -26,6 +26,7 @@ __all__ = [
     "io_download",
 ]
 
+import io
 import logging
 import os
 import warnings
@@ -79,6 +80,7 @@ def io_download(
 
     # write the file
     with AtomicOpen(dst_path, "wb" if overwrite else "xb") as fp:
+        assert isinstance(fp, (io.RawIOBase, io.BufferedIOBase)), f"expected a binary file handle, got: {type(fp)}"
         response = requests.get(src_url, stream=True)
 
         # get the file size from the request for the progress bar
