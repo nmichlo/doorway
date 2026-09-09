@@ -31,24 +31,19 @@ __all__ = [
 ]
 
 import os
+from collections.abc import Callable
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Callable, List, Literal, Tuple
-from typing import Iterable
-from typing import Optional
-from typing import Union
-from typing import TypeVar
+from typing import Literal
 
 from doorway._hash import Hash
 from doorway._hash import HashAlgo
 from doorway._hash import hash_str
 
-
 # ========================================================================= #
 # individual shards                                                         #
 # ========================================================================= #
 
-
-T = TypeVar("T")
 
 _SHARD_KEYS = {
     "basename": os.path.basename,
@@ -56,13 +51,13 @@ _SHARD_KEYS = {
     "input": lambda x: x,
 }
 
-ShardKey = Optional[Union[str, Callable[[T], str]]]
+type ShardKey[T] = str | Callable[[T], str] | None
 
 
-def shard_hash(
+def shard_hash[T](
     value: T,
     shard_key: ShardKey[T] = None,
-    hash_algo: Optional[HashAlgo] = None,
+    hash_algo: HashAlgo | None = None,
 ) -> Hash:
     # get the hash data function
     if shard_key is None:
@@ -77,9 +72,7 @@ def shard_hash(
             )
         value = fn(value)
     else:
-        raise ValueError(
-            f"shard_key must be a str, callable or None, got: {repr(shard_key)}"
-        )
+        raise ValueError(f"shard_key must be a str, callable or None, got: {repr(shard_key)}")
     # get the string
     assert isinstance(value, (str, Path)), (
         f"The value after shard_key is applied must be a str or Path, instead got type: {type(value)}, with value: {repr(value)}"
@@ -88,11 +81,11 @@ def shard_hash(
     return hash_str(str(value), hash_algo=hash_algo)
 
 
-def shard_idx(
+def shard_idx[T](
     value: T,
     num_shards: int,
     shard_key: ShardKey[T] = None,
-    hash_algo: Optional[HashAlgo] = None,
+    hash_algo: HashAlgo | None = None,
 ) -> int:
     assert isinstance(num_shards, int) and (num_shards > 0), (
         f"num_shards must be an integer that is > 0, got: {repr(num_shards)}"
@@ -114,19 +107,19 @@ _SHARD_RETURNS = {
     "values": lambda i, value: value,
 }
 
-_ShardsReturnHint = Union[
-    List[Tuple[int, T]],  # pairs
-    List[int],  # indices
-    List[T],  # values
-]
+type _ShardsReturnHint[T] = (
+    list[tuple[int, T]]  # pairs
+    | list[int]  # indices
+    | list[T]  # values
+)
 
 
-def sharded(
+def sharded[T](
     values: Iterable[T],
     num_shards: int,
     *,
     shard_key: ShardKey[T] = None,
-    hash_algo: Optional[HashAlgo] = None,
+    hash_algo: HashAlgo | None = None,
     returns: Literal["pairs", "indices", "values"] = "values",
 ) -> _ShardsReturnHint[T]:
     """
@@ -134,9 +127,7 @@ def sharded(
     """
     # shard functions
     if returns not in _SHARD_RETURNS:
-        raise KeyError(
-            f"invalid shards returns: {repr(returns)}, must be one of: {sorted(_SHARD_RETURNS.keys())}"
-        )
+        raise KeyError(f"invalid shards returns: {repr(returns)}, must be one of: {sorted(_SHARD_RETURNS.keys())}")
     value_getter = _SHARD_RETURNS[returns]
     # create new array of shards
     shards = [[] for _ in range(num_shards)]
@@ -148,12 +139,12 @@ def sharded(
     return shards
 
 
-def sharded_weighted(
+def sharded_weighted[T](
     values: Iterable[T],
     shard_weights: Iterable[int],
     *,
     shard_key: ShardKey[T] = None,
-    hash_algo: Optional[HashAlgo] = None,
+    hash_algo: HashAlgo | None = None,
     returns: Literal["pairs", "indices", "values"] = "values",
 ) -> _ShardsReturnHint[T]:
     """
@@ -177,9 +168,7 @@ def sharded_weighted(
     # group all the shards together
     weighted_buckets, i = [], 0
     for num_shards in shard_weights:
-        weighted_buckets.append(
-            [item for shard in shards[i : i + num_shards] for item in shard]
-        )
+        weighted_buckets.append([item for shard in shards[i : i + num_shards] for item in shard])
         i += num_shards
     # done!
     return weighted_buckets

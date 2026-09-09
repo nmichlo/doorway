@@ -1,0 +1,21 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  # base deps only -- doorway has no required dependencies, so this proves the
+  # core imports and works with nothing installed but the package itself.
+  defaults:
+    uses: nmichlo/.github/.github/workflows/pytest.yaml@main
+    with:
+      python-versions: '["3.12", "3.13"]'
+      install-extras: "test"
+
+  extras:
+    uses: nmichlo/.github/.github/workflows/pytest.yaml@main
+    with:
+      python-versions: '["3.12", "3.13"]'
+      install-extras: "extras,test"

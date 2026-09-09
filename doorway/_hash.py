@@ -48,13 +48,10 @@ __all__ = [
 import hashlib
 import os
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict
-from typing import Iterable
-from typing import Optional
-from typing import Union
-from doorway._env_vars import EnvVar
 
+from doorway._env_vars import EnvVar
 
 # ========================================================================= #
 # byte producers                                                            #
@@ -94,10 +91,10 @@ def _yield_fast_hash_bytes(file: str, chunk_size=16384, num_chunks=3):
 
 
 Hash = str
-Hashes = Union[str, Dict[str, str]]
+type Hashes = str | dict[str, str]
 HashMode = str
 HashAlgo = str
-HashPath = Union[str, Path]
+type HashPath = str | Path
 
 
 # ========================================================================= #
@@ -118,20 +115,18 @@ _VAR_HANDLER_HASH_MODE = EnvVar.env_str(
 )
 
 
-def hash_mode_get(hash_mode: Optional[HashMode] = None) -> HashMode:
+def hash_mode_get(hash_mode: HashMode | None = None) -> HashMode:
     return _VAR_HANDLER_HASH_MODE.get(override=hash_mode)
 
 
 _VAR_HANDLER_HASH_ALGO = EnvVar.env_str(
     key="DOORWAY_HASH_ALGO",
     default="md5",
-    validator=EnvVar.validator_allowed(
-        hashlib.algorithms_guaranteed | hashlib.algorithms_available
-    ),
+    validator=EnvVar.validator_allowed(hashlib.algorithms_guaranteed | hashlib.algorithms_available),
 )
 
 
-def hash_algo_get(hash_algo: Optional[HashAlgo] = None) -> HashAlgo:
+def hash_algo_get(hash_algo: HashAlgo | None = None) -> HashAlgo:
     return _VAR_HANDLER_HASH_ALGO.get(override=hash_algo)
 
 
@@ -140,16 +135,14 @@ def hash_algo_get(hash_algo: Optional[HashAlgo] = None) -> HashAlgo:
 # ========================================================================= #
 
 
-def hash_bytes(bytes_str: bytes, hash_algo: Optional[HashAlgo] = None) -> str:
+def hash_bytes(bytes_str: bytes, hash_algo: HashAlgo | None = None) -> str:
     # normalise the hash_algo
     hash_algo = hash_algo_get(hash_algo=hash_algo)
     # generate hash and convert to a string
     return hashlib.new(hash_algo, data=bytes_str).hexdigest()
 
 
-def hash_bytes_iter(
-    bytes_iter: Iterable[bytes], hash_algo: Optional[HashAlgo] = None
-) -> str:
+def hash_bytes_iter(bytes_iter: Iterable[bytes], hash_algo: HashAlgo | None = None) -> str:
     # normalise the hash_algo
     hash_algo = hash_algo_get(hash_algo=hash_algo)
     # generate hash and convert to a string
@@ -159,17 +152,15 @@ def hash_bytes_iter(
     return hash.hexdigest()
 
 
-def hash_str(
-    str: str, hash_algo: Optional[HashAlgo] = None, encoding: str = "utf-8"
-) -> str:
+def hash_str(str: str, hash_algo: HashAlgo | None = None, encoding: str = "utf-8") -> str:
     # encode string as bytes and then hash
     return hash_bytes(str.encode(encoding), hash_algo=hash_algo)
 
 
 def hash_file(
     path: HashPath,
-    hash_mode: Optional[HashMode] = None,
-    hash_algo: Optional[HashAlgo] = None,
+    hash_mode: HashMode | None = None,
+    hash_algo: HashAlgo | None = None,
     hash_missing: bool = False,
 ) -> Hash:
     """
@@ -190,9 +181,7 @@ def hash_file(
     else:
         if hash_missing:
             return ""
-        raise FileNotFoundError(
-            f"could not compute hash for missing file: {repr(path)}"
-        )
+        raise FileNotFoundError(f"could not compute hash for missing file: {repr(path)}")
     # get file bytes iterator
     byte_producer = _FILE_BYTE_PRODUCERS[hash_mode]
     bytes_iter = byte_producer(path)
@@ -213,8 +202,8 @@ class HashError(Exception):
 
 def hash_norm(
     hash: Hashes,
-    hash_mode: Optional[HashMode] = None,
-    hash_algo: Optional[HashAlgo] = None,
+    hash_mode: HashMode | None = None,
+    hash_algo: HashAlgo | None = None,
 ) -> Hash:
     """
     file hashes depend on the mode.
@@ -249,9 +238,7 @@ def hash_norm(
             )
     # check the result
     if not isinstance(hash, str):
-        raise TypeError(
-            f"normalized hash should be a str, got type: {type(hash)} for value: {repr(hash)}"
-        )
+        raise TypeError(f"normalized hash should be a str, got type: {type(hash)} for value: {repr(hash)}")
     # done!
     return hash
 
@@ -259,8 +246,8 @@ def hash_norm(
 def hash_file_validate(
     path: HashPath,
     hash: Hashes,
-    hash_mode: Optional[HashMode] = None,
-    hash_algo: Optional[HashAlgo] = None,
+    hash_mode: HashMode | None = None,
+    hash_algo: HashAlgo | None = None,
     hash_missing: bool = False,
 ) -> None:
     """
@@ -269,9 +256,7 @@ def hash_file_validate(
     # normalize the hash
     hash: str = hash_norm(hash=hash, hash_mode=hash_mode)
     # compute the hash
-    fhash = hash_file(
-        path=path, hash_algo=hash_algo, hash_mode=hash_mode, hash_missing=hash_missing
-    )
+    fhash = hash_file(path=path, hash_algo=hash_algo, hash_mode=hash_mode, hash_missing=hash_missing)
     # check the hash
     if fhash != hash:
         # functions above also call this, we need to do it again for the error message
@@ -286,8 +271,8 @@ def hash_file_validate(
 def hash_file_is_valid(
     path: HashPath,
     hash: Hashes,
-    hash_mode: Optional[HashMode] = None,
-    hash_algo: Optional[HashAlgo] = None,
+    hash_mode: HashMode | None = None,
+    hash_algo: HashAlgo | None = None,
     hash_missing: bool = False,
 ) -> bool:
     try:

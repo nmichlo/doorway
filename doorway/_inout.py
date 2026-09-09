@@ -31,9 +31,7 @@ import os
 import warnings
 from typing import Literal
 
-
 from doorway._atomic import AtomicOpen
-
 
 LOG = logging.getLogger(__name__)
 
@@ -56,16 +54,13 @@ def io_download(
         import requests
     except ImportError:
         raise ImportError(
-            "The `requests` package is required for downloading files.\n"
-            "You can install it via: `pip install requests`."
+            "The `requests` package is required for downloading files.\nYou can install it via: `pip install requests`."
         )
 
     try:
         from tqdm import tqdm
     except ImportError:
-        warnings.warn(
-            "The `tqdm` package is not installed, progress bar will not be shown.\n"
-        )
+        warnings.warn("The `tqdm` package is not installed, progress bar will not be shown.\n")
         tqdm = None
         progress = False
 

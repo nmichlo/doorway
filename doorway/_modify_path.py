@@ -30,10 +30,6 @@ __all__ = [
 
 
 from pathlib import Path
-from typing import Optional
-from typing import Tuple
-from typing import Union
-
 
 # ========================================================================= #
 # Basename formatting                                                       #
@@ -43,7 +39,7 @@ from typing import Union
 def basename_split_ext(
     basename: str,
     name_contains_sep: bool = True,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     # split the name from the basename
     if name_contains_sep:
         components = basename.rsplit(".", 1)
@@ -60,18 +56,16 @@ def basename_split_ext(
 
 def basename_modify(
     basename: str,
-    ext: Optional[str] = None,
-    name_prefix: Optional[str] = None,
-    name_suffix: Optional[str] = None,
-    basename_prefix: Optional[str] = None,
-    basename_suffix: Optional[str] = None,
+    ext: str | None = None,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    basename_prefix: str | None = None,
+    basename_suffix: str | None = None,
     name_contains_sep: bool = True,
 ) -> str:
     # 1. surround the name & replace the extension
     if name_suffix or ext:
-        name, dot_ext = basename_split_ext(
-            basename, name_contains_sep=name_contains_sep
-        )
+        name, dot_ext = basename_split_ext(basename, name_contains_sep=name_contains_sep)
         if ext:
             dot_ext = f".{ext}"
         if name_suffix:
@@ -94,23 +88,19 @@ def basename_modify(
 
 
 def path_basename_modify(
-    file: Union[str, Path],
-    ext: Optional[str] = None,
-    name_prefix: Optional[str] = None,
-    name_suffix: Optional[str] = None,
-    basename_prefix: Optional[str] = None,
-    basename_suffix: Optional[str] = None,
+    file: str | Path,
+    ext: str | None = None,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    basename_prefix: str | None = None,
+    basename_suffix: str | None = None,
     name_contains_sep: bool = True,
-) -> Union[str, Path]:
+) -> str | Path:
     # get path components
     path = Path(file)
     basename = path.name
     if not basename:
-        raise ValueError(
-            f"file basename cannot be empty, "
-            f"got basename: {repr(basename)}, "
-            f"from file: {repr(str(file))}"
-        )
+        raise ValueError(f"file basename cannot be empty, got basename: {repr(basename)}, from file: {repr(str(file))}")
     # update the basename
     basename = basename_modify(
         basename=basename,

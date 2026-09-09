@@ -23,9 +23,8 @@
 #  ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~
 import pytest
 
-from doorway._fmt import fmt_bytes_to_human
 from doorway._ctx import ctx_temp_environ
-
+from doorway._fmt import fmt_bytes_to_human
 
 # ========================================================================= #
 # TEST UTILS                                                                #
@@ -129,9 +128,7 @@ def test_fmt_bytes_to_human():
         assert fmt_bytes_to_human(1025**12, base=1024) == "1060930.215 QiB"
         assert fmt_bytes_to_human(1025**12, base=1000) == "1344888.824 QB"
 
-        with pytest.raises(
-            ValueError, match="invalid size in bytes, cannot be negative: -1337"
-        ):
+        with pytest.raises(ValueError, match="invalid size in bytes, cannot be negative: -1337"):
             fmt_bytes_to_human(-1337, base=1000)
 
         # check rounding with +1 or -1 values
@@ -140,10 +137,7 @@ def test_fmt_bytes_to_human():
         assert fmt_bytes_to_human(1024**2 + 0, base=1024) == "1.000 MiB"
         assert fmt_bytes_to_human(1024**2 + 1, base=1024) == "1.000 MiB"
 
-        assert (
-            fmt_bytes_to_human(1024**3 - 1, base=1024, round_unit=False)
-            == "1024.000 MiB"
-        )
+        assert fmt_bytes_to_human(1024**3 - 1, base=1024, round_unit=False) == "1024.000 MiB"
         assert fmt_bytes_to_human(1024**3 - 1, base=1024) == "1.000 GiB"
         assert fmt_bytes_to_human(1024**3 + 0, base=1024) == "1.000 GiB"
         assert fmt_bytes_to_human(1024**3 + 1, base=1024) == "1.000 GiB"
@@ -156,59 +150,26 @@ def test_fmt_bytes_to_human():
         assert fmt_bytes_to_human(1024**3 + 0, base=1000) == "1.074 GB"
         assert fmt_bytes_to_human(1024**3 + 1, base=1000) == "1.074 GB"
 
-        assert (
-            fmt_bytes_to_human(1000**3 - 1, base=1000, round_unit=False)
-            == "1000.000 MB"
-        )
+        assert fmt_bytes_to_human(1000**3 - 1, base=1000, round_unit=False) == "1000.000 MB"
         assert fmt_bytes_to_human(1000**3 - 1, base=1000) == "1.000 GB"
         assert fmt_bytes_to_human(1000**3 + 0, base=1000) == "1.000 GB"
         assert fmt_bytes_to_human(1000**3 + 1, base=1000) == "1.000 GB"
 
         # check rounding styles
 
-        assert (
-            fmt_bytes_to_human(1024**3 - 1, base=1024, round_unit=True) == "1.000 GiB"
-        )
-        assert (
-            fmt_bytes_to_human(1024**3 - 1, base=1024, round_unit=False)
-            == "1024.000 MiB"
-        )
-        assert (
-            fmt_bytes_to_human(1024**3 - 524, base=1024, round_unit=True) == "1.000 GiB"
-        )
-        assert (
-            fmt_bytes_to_human(1024**3 - 524, base=1024, round_unit=False)
-            == "1024.000 MiB"
-        )
-        assert (
-            fmt_bytes_to_human(1024**3 - 525, base=1024, round_unit=True)
-            == "1023.999 MiB"
-        )
-        assert (
-            fmt_bytes_to_human(1024**3 - 525, base=1024, round_unit=False)
-            == "1023.999 MiB"
-        )
+        assert fmt_bytes_to_human(1024**3 - 1, base=1024, round_unit=True) == "1.000 GiB"
+        assert fmt_bytes_to_human(1024**3 - 1, base=1024, round_unit=False) == "1024.000 MiB"
+        assert fmt_bytes_to_human(1024**3 - 524, base=1024, round_unit=True) == "1.000 GiB"
+        assert fmt_bytes_to_human(1024**3 - 524, base=1024, round_unit=False) == "1024.000 MiB"
+        assert fmt_bytes_to_human(1024**3 - 525, base=1024, round_unit=True) == "1023.999 MiB"
+        assert fmt_bytes_to_human(1024**3 - 525, base=1024, round_unit=False) == "1023.999 MiB"
 
         assert fmt_bytes_to_human(1000**3 - 1, base=1000, round_unit=True) == "1.000 GB"
-        assert (
-            fmt_bytes_to_human(1000**3 - 1, base=1000, round_unit=False)
-            == "1000.000 MB"
-        )
-        assert (
-            fmt_bytes_to_human(1000**3 - 500, base=1000, round_unit=True) == "1.000 GB"
-        )
-        assert (
-            fmt_bytes_to_human(1000**3 - 500, base=1000, round_unit=False)
-            == "1000.000 MB"
-        )
-        assert (
-            fmt_bytes_to_human(1000**3 - 501, base=1000, round_unit=True)
-            == "999.999 MB"
-        )
-        assert (
-            fmt_bytes_to_human(1000**3 - 501, base=1000, round_unit=False)
-            == "999.999 MB"
-        )
+        assert fmt_bytes_to_human(1000**3 - 1, base=1000, round_unit=False) == "1000.000 MB"
+        assert fmt_bytes_to_human(1000**3 - 500, base=1000, round_unit=True) == "1.000 GB"
+        assert fmt_bytes_to_human(1000**3 - 500, base=1000, round_unit=False) == "1000.000 MB"
+        assert fmt_bytes_to_human(1000**3 - 501, base=1000, round_unit=True) == "999.999 MB"
+        assert fmt_bytes_to_human(1000**3 - 501, base=1000, round_unit=False) == "999.999 MB"
 
         # check default values
         assert fmt_bytes_to_human(1000**4, base=1024) == fmt_bytes_to_human(1000**4)

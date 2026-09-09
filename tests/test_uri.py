@@ -76,22 +76,16 @@ def test_filename_from_uri():
     uri_validate("/")
     uri_validate("./")
     uri_validate(".")
-    with pytest.raises(
-        UriMalformedException, match="field 'path' is required, but got value: None"
-    ):
+    with pytest.raises(UriMalformedException, match="field 'path' is required, but got value: None"):
         uri_validate("")
 
     # test basic urls
     uri_validate("http://prefix/basename.ext/suffix")
     uri_validate("http://basename.ext/suffix")
     uri_validate("HTTP://basename.ext/suffix")
-    with pytest.raises(
-        UriMalformedException, match="field 'host' is required, but got value: None"
-    ):
+    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: None"):
         uri_validate("http:/basename.ext/suffix")
-    with pytest.raises(
-        UriMalformedException, match="field 'host' is required, but got value: None"
-    ):
+    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: None"):
         uri_validate("http:///basename.ext/suffix")
 
     # test url ports
@@ -102,9 +96,7 @@ def test_filename_from_uri():
     uri_validate("http://192.168.0.1")
     uri_validate("http://192.168.0.1:")
     uri_validate("http://192.168.0.1:3000")
-    with pytest.raises(
-        UriMalformedException, match="field 'host' is required, but got value: ''"
-    ):
+    with pytest.raises(UriMalformedException, match="field 'host' is required, but got value: ''"):
         uri_validate("http://:3000")
 
     # test urls and fragments etc
