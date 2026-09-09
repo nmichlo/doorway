@@ -6,16 +6,23 @@ on:
     branches: [main]
 
 jobs:
-  # base deps only -- doorway has no required dependencies, so this proves the
-  # core imports and works with nothing installed but the package itself.
+  # base deps only -- doorway declares no required dependencies, so this proves
+  # the core works with nothing installed but the package itself. the
+  # extras-dependent tests are marked and skipped here.
   defaults:
     uses: nmichlo/.github/.github/workflows/pytest.yaml@main
     with:
       python-versions: '["3.12", "3.13"]'
       install-extras: "test"
+      pytest-args: "--color=yes --verbose -m 'not extra_test'"
+      coverage: "doorway"
+    secrets: inherit
 
   extras:
     uses: nmichlo/.github/.github/workflows/pytest.yaml@main
     with:
       python-versions: '["3.12", "3.13"]'
       install-extras: "extras,test"
+      pytest-args: "--color=yes --verbose"
+      coverage: "doorway"
+    secrets: inherit

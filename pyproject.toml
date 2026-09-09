@@ -95,3 +95,18 @@ force-single-line = true
 
 [tool.ty.environment]
 python-version = "3.12"
+
+
+# ========================================================================= #
+# PYTEST                                                                    #
+# ========================================================================= #
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+# usage:
+#   annotation: `@pytest.mark.extra_test`
+#   skip tests: `pytest -m 'not extra_test'`
+markers = [
+    "extra_test: tests that depend on the `extras` optional dependencies",
+]
