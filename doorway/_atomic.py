@@ -31,13 +31,10 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import BinaryIO
-from typing import TextIO
-from typing import Union
+from typing import IO
 from uuid import uuid4
 
 from doorway._modify_path import path_basename_modify
-
 
 LOG = logging.getLogger(__name__)
 
@@ -53,7 +50,7 @@ _MODE_TRY_COPY = "a"
 _MODE_EXISTING = "r+"
 
 
-class AtomicPath(object):
+class AtomicPath:
     """
     Within the context, data must be written to a temporary file.
     Once data has been successfully written, the temporary file
@@ -105,7 +102,7 @@ class AtomicPath(object):
 
     def __init__(
         self,
-        file: Union[str, Path],
+        file: str | Path,
         mode: str = _MODE_MISSING,
         makedirs: bool = False,
     ):
@@ -130,9 +127,7 @@ class AtomicPath(object):
         # check that the files are different, but that
         # their parent directories are the same
         if self._dst_path == self._tmp_path:
-            raise ValueError(
-                f"temporary and destination files are the same: {self._tmp_path} == {self._dst_path}"
-            )
+            raise ValueError(f"temporary and destination files are the same: {self._tmp_path} == {self._dst_path}")
         if self._dst_path.parent != self._tmp_path.parent:
             raise ValueError(
                 f"temporary and destination directories are not same: {self._tmp_path.parent} != {self._dst_path.parent}"
@@ -146,42 +141,30 @@ class AtomicPath(object):
         # 1. check that the temporary file does not already exist
         #    this should be impossible
         if self._tmp_path.exists():
-            raise RuntimeError(
-                f"the temporary file already exists: {self._tmp_path}, this is a bug!"
-            )
+            raise RuntimeError(f"the temporary file already exists: {self._tmp_path}, this is a bug!")
 
         # 2. handle the different modes for when the destination file exists
         # - make sure the destination does not exist
         if self._mode == _MODE_MISSING:
             if self._dst_path.exists():
-                raise FileExistsError(
-                    f"the destination file should not exist: {self._dst_path}"
-                )
+                raise FileExistsError(f"the destination file should not exist: {self._dst_path}")
         # - make sure the destination can be replaced
         elif self._mode == _MODE_REPLACE:
             if self._dst_path.exists():
                 if not self._dst_path.is_file():
-                    raise IsADirectoryError(
-                        f"the destination file exists but is not a file: {self._dst_path}"
-                    )
+                    raise IsADirectoryError(f"the destination file exists but is not a file: {self._dst_path}")
         # - make sure the destination can be replaced and try copy it
         elif self._mode in (_MODE_REPLACE, _MODE_TRY_COPY, _MODE_EXISTING):
             if self._dst_path.exists():
                 if not self._dst_path.is_file():
-                    raise IsADirectoryError(
-                        f"the destination file exists but is not a file: {self._dst_path}"
-                    )
+                    raise IsADirectoryError(f"the destination file exists but is not a file: {self._dst_path}")
                 shutil.copy(self._dst_path, self._tmp_path)
         # - make sure the destination exists, can be replaced and copy it
         elif self._mode == _MODE_EXISTING:
             if not self._dst_path.exists():
-                raise FileExistsError(
-                    f"the destination file should exist: {self._dst_path}"
-                )
+                raise FileExistsError(f"the destination file should exist: {self._dst_path}")
             elif not self._dst_path.is_file():
-                raise FileExistsError(
-                    f"the destination file exists but is not a file: {self._dst_path}"
-                )
+                raise FileExistsError(f"the destination file exists but is not a file: {self._dst_path}")
             shutil.copy(self._dst_path, self._tmp_path)
         # - make sure the mode is valid
         else:
@@ -203,18 +186,14 @@ class AtomicPath(object):
                         f"An error occured in {self.__class__.__name__}, but could not clean up the temporary file because it is a directory: {self._tmp_path}"
                     )
                 self._tmp_path.unlink(missing_ok=True)
-                LOG.error(
-                    f"An error occurred in {self.__class__.__name__}, deleted temporary file: {self._tmp_path}"
-                )
+                LOG.error(f"An error occurred in {self.__class__.__name__}, deleted temporary file: {self._tmp_path}")
             else:
                 LOG.error(f"An error occurred in {self.__class__.__name__}")
             return
 
         # 1. check that the temporary file was created in this context
         if not self._tmp_path.exists():
-            raise FileNotFoundError(
-                f"the temporary file was not created: {self._tmp_path}"
-            )
+            raise FileNotFoundError(f"the temporary file was not created: {self._tmp_path}")
         if not self._tmp_path.is_file():
             raise RuntimeError(f"the temporary file is not a file: {self._tmp_path}")
 
@@ -222,9 +201,7 @@ class AtomicPath(object):
         # - make sure the destination does not exist
         if self._mode == _MODE_MISSING:
             if self._dst_path.exists():
-                raise FileExistsError(
-                    f"the destination file should not exist: {self._dst_path}"
-                )
+                raise FileExistsError(f"the destination file should not exist: {self._dst_path}")
         # - no checks needed
         elif self._mode in (_MODE_REPLACE, _MODE_TRY_COPY, _MODE_EXISTING):
             pass
@@ -234,13 +211,11 @@ class AtomicPath(object):
 
         # 3. move the temp file to the destination file. `os.rename` is usually
         # guaranteed to be atomic on linux and also overwrites the destination path
-        LOG.info(
-            f"moving temporary file to final location: {self._tmp_path} -> {self._dst_path}"
-        )
+        LOG.info(f"moving temporary file to final location: {self._tmp_path} -> {self._dst_path}")
         os.rename(self._tmp_path, self._dst_path)
 
 
-class AtomicOpen(object):
+class AtomicOpen:
     # SUPPORTED MODES:
     # 'r': open for reading (default)
     # 'a': open for writing, appending to the end of the file if it exists
@@ -257,7 +232,7 @@ class AtomicOpen(object):
 
     def __init__(
         self,
-        file: Union[str, Path],
+        file: str | Path,
         mode: str = "r",
         makedirs: bool = False,
     ):
@@ -275,7 +250,7 @@ class AtomicOpen(object):
 
         # set the class vars
         self._open_mode = mode
-        self._file_io = None
+        self._file_io: IO[bytes] | IO[str] | None = None
         self._orig_path = file
 
         # handle the different basic modes
@@ -288,7 +263,7 @@ class AtomicOpen(object):
                 makedirs=makedirs,
             )
 
-    def __enter__(self) -> Union[TextIO, BinaryIO]:
+    def __enter__(self) -> IO[bytes] | IO[str]:
         # - we should be in read-only mode
         if self._atomic_path is None:
             tmp_path = self._orig_path
@@ -296,9 +271,7 @@ class AtomicOpen(object):
         # - prepare like usual
         else:
             tmp_path = self._atomic_path.__enter__()
-            LOG.debug(
-                f"opening temporary file: {tmp_path} with mode: {self._open_mode}"
-            )
+            LOG.debug(f"opening temporary file: {tmp_path} with mode: {self._open_mode}")
 
         # open and return the file
         self._file_io = open(tmp_path, self._open_mode)
@@ -306,6 +279,7 @@ class AtomicOpen(object):
 
     def __exit__(self, error_type, error, traceback):
         # close the temp file
+        assert self._file_io is not None, "the file was not opened, this is a bug!"
         try:
             self._file_io.close()
         finally:

@@ -158,7 +158,7 @@ from doorway import io_download
 io_download(
     src_url="https://example.com/file.txt",
     dst_path="my/file.txt",
-    exists_mode="error", # options are: "error" (default), "overwrite", "skip"
+    exists_mode="error",  # options are: "error" (default), "overwrite", "skip"
     progress=True,  # (default)
 )
 ```
@@ -294,7 +294,7 @@ downloader = ProxyDownloader()
 
 # download a single file with a randomly chosen proxy
 path = downloader.download(
-    "https://example.com/file.txt", # src
+    "https://example.com/file.txt",  # src
     "my/file.txt",  # dst
     exists_mode="error",  # options are: "error" (default), "overwrite", "skip"
 )
@@ -307,7 +307,7 @@ failed = downloader.download_threaded(
         ("https://example.com/file3.txt", "my/file3.txt"),
     ],
     exists_mode="error",  # options are: "error" (default), "overwrite", "skip"
-    verbose=True, # (default is False)
+    verbose=True,  # (default is False)
     ignore_failures=True,  # (default is False)
 )
 ```
@@ -320,16 +320,17 @@ the *default* scrape logic by registering a new scrape function.
 ```python3
 from doorway.x import proxies_register_scraper
 
-@proxies_register_scraper(name='my_proxy_source', is_default=True)
+
+@proxies_register_scraper(name="my_proxy_source", is_default=True)
 def custom_proxy_scraper(proxy_type):
     # you should respect this setting
-    assert proxy_type in ('all', 'http', 'https')
+    assert proxy_type in ("all", "http", "https")
     # proxies is a list of dictionaries, where each dictionary only has one entry:
     # - the key is the protocol
     # - the value is the matching full url
     return [
-        {'HTTP': 'http://<my-http-proxy>.com'},
-        {'HTTPS': 'https://<my-https-proxy>.com'},
+        {"HTTP": "http://<my-http-proxy>.com"},
+        {"HTTPS": "https://<my-https-proxy>.com"},
     ]
 ```
 

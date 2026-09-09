@@ -26,14 +26,13 @@ __all__ = [
     "io_download",
 ]
 
+import io
 import logging
 import os
 import warnings
 from typing import Literal
 
-
 from doorway._atomic import AtomicOpen
-
 
 LOG = logging.getLogger(__name__)
 
@@ -56,16 +55,13 @@ def io_download(
         import requests
     except ImportError:
         raise ImportError(
-            "The `requests` package is required for downloading files.\n"
-            "You can install it via: `pip install requests`."
+            "The `requests` package is required for downloading files.\nYou can install it via: `pip install requests`."
         )
 
     try:
         from tqdm import tqdm
     except ImportError:
-        warnings.warn(
-            "The `tqdm` package is not installed, progress bar will not be shown.\n"
-        )
+        warnings.warn("The `tqdm` package is not installed, progress bar will not be shown.\n")
         tqdm = None
         progress = False
 
@@ -84,6 +80,7 @@ def io_download(
 
     # write the file
     with AtomicOpen(dst_path, "wb" if overwrite else "xb") as fp:
+        assert isinstance(fp, (io.RawIOBase, io.BufferedIOBase)), f"expected a binary file handle, got: {type(fp)}"
         response = requests.get(src_url, stream=True)
 
         # get the file size from the request for the progress bar

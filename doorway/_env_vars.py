@@ -32,20 +32,21 @@ __all__ = (
 )
 
 import os
-from typing import Callable, Iterable, Optional
-from typing import Sequence
-from typing import Generic
-from typing import TypeVar
+from collections.abc import Callable
+from collections.abc import Iterable
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from _typeshed import SupportsAllComparisons
 
 # ========================================================================= #
 # Types                                                                     #
 # ========================================================================= #
 
 
-T = TypeVar("T")
-EnvVarFnConverterHint = Callable[[str], T]
-EnvVarFnValidatorHint = Callable[[T], T]
+type EnvVarFnConverterHint[T] = Callable[[str], T]
+type EnvVarFnValidatorHint[T] = Callable[[T], T]
 
 
 # ========================================================================= #
@@ -82,7 +83,7 @@ class EnvVarConversionError(EnvVarError):
 # ========================================================================= #
 
 
-class EnvVar(Generic[T]):
+class EnvVar[T]:
     """
     A flexible handler for environment variables of any type.
 
@@ -99,9 +100,9 @@ class EnvVar(Generic[T]):
         self,
         key: str,
         *,
-        default: Optional[T] = None,
-        converter: Optional[EnvVarFnConverterHint[T]] = None,  # applied to env str
-        validator: Optional[EnvVarFnValidatorHint[T]] = None,  # applied to all values
+        default: T | None = None,
+        converter: EnvVarFnConverterHint[T] | None = None,  # applied to env str
+        validator: EnvVarFnValidatorHint[T] | None = None,  # applied to all values
     ):
         self._key = key
         self._env_converter = converter or (lambda x: x)
@@ -116,11 +117,11 @@ class EnvVar(Generic[T]):
 
     # set or / clear with `None`
 
-    def set_default_value(self, value: Optional[T]) -> None:
+    def set_default_value(self, value: T | None) -> None:
         # do not apply validator until get, more inefficient, but easier to test
         self._persisted_default = value
 
-    def set_override_value(self, value: Optional[T]) -> None:
+    def set_override_value(self, value: T | None) -> None:
         # do not apply validator until get, more inefficient, but easier to test
         self._persisted_override = value
 
@@ -130,12 +131,10 @@ class EnvVar(Generic[T]):
     def value(self) -> T:
         return self.get()
 
-    def __call__(
-        self, *, default: Optional[T] = None, override: Optional[T] = None
-    ) -> T:
+    def __call__(self, *, default: T | None = None, override: T | None = None) -> T:
         return self.get(default=default, override=override)
 
-    def get(self, *, default: Optional[T] = None, override: Optional[T] = None) -> T:
+    def get(self, *, default: T | None = None, override: T | None = None) -> T:
         # convert / extract values
 
         if override is not None:
@@ -162,9 +161,7 @@ class EnvVar(Generic[T]):
             raise EnvVarMissingError(f"error getting {repr(self._key)} from any source")
         # handle missing values
         if result is None:
-            raise EnvVarMissingError(
-                f"error getting {repr(self._key)} from {repr(source)}"
-            )
+            raise EnvVarMissingError(f"error getting {repr(self._key)} from {repr(source)}")
         # validate the result
         try:
             return self._val_validator(result)
@@ -176,8 +173,8 @@ class EnvVar(Generic[T]):
     # ===== static helpers ===== #
 
     @classmethod
-    def as_converter(cls, fn: EnvVarFnConverterHint[T]) -> EnvVarFnConverterHint[T]:
-        def _converter(value: str) -> T:
+    def as_converter[V](cls, fn: EnvVarFnConverterHint[V]) -> EnvVarFnConverterHint[V]:
+        def _converter(value: str) -> V:
             try:
                 return fn(value)
             except Exception as e:
@@ -191,9 +188,7 @@ class EnvVar(Generic[T]):
             try:
                 return fn(value)
             except Exception as e:
-                raise EnvVarValidationError(
-                    f"error validating {repr(value)} with {fn}: {e}"
-                )
+                raise EnvVarValidationError(f"error validating {repr(value)} with {fn}: {e}")
 
         return _validator
 
@@ -218,26 +213,20 @@ class EnvVar(Generic[T]):
 
         def _validator(value: T) -> T:
             if value not in allowed_values:
-                raise EnvVarValidationError(
-                    f"value {repr(value)} must be one of: {allowed_values}"
-                )
+                raise EnvVarValidationError(f"value {repr(value)} must be one of: {allowed_values}")
             return value
 
         return _validator
 
     @classmethod
-    def validator_min_max(
-        cls, min_value: Optional[T], max_value: Optional[T]
-    ) -> EnvVarFnValidatorHint[T]:
-        def _validator(value: T) -> T:
+    def validator_min_max[V: "SupportsAllComparisons"](
+        cls, min_value: V | None, max_value: V | None
+    ) -> EnvVarFnValidatorHint[V]:
+        def _validator(value: V) -> V:
             if min_value is not None and value < min_value:
-                raise EnvVarValidationError(
-                    f"value {repr(value)} must be greater than or equal to {min_value}"
-                )
+                raise EnvVarValidationError(f"value {repr(value)} must be greater than or equal to {min_value}")
             if max_value is not None and value > max_value:
-                raise EnvVarValidationError(
-                    f"value {repr(value)} must be less than or equal to {max_value}"
-                )
+                raise EnvVarValidationError(f"value {repr(value)} must be less than or equal to {max_value}")
             return value
 
         return _validator
@@ -249,13 +238,13 @@ class EnvVar(Generic[T]):
         cls,
         key: str,
         *,
-        default: Optional[str] = None,
-        validator: Optional[EnvVarFnValidatorHint[str]] = None,
+        default: str | None = None,
+        validator: EnvVarFnValidatorHint[str] | None = None,
     ) -> "EnvVar[str]":
-        return cls(
+        return EnvVar(
             key=key,
             default=default,
-            converter=cls.as_converter(str),
+            converter=EnvVar.as_converter(str),
             validator=validator,
         )
 
@@ -264,13 +253,13 @@ class EnvVar(Generic[T]):
         cls,
         key: str,
         *,
-        default: Optional[int] = None,
-        validator: Optional[EnvVarFnValidatorHint[int]] = None,
+        default: int | None = None,
+        validator: EnvVarFnValidatorHint[int] | None = None,
     ) -> "EnvVar[int]":
-        return cls(
+        return EnvVar(
             key=key,
             default=default,
-            converter=cls.as_converter(int),
+            converter=EnvVar.as_converter(int),
             validator=validator,
         )
 
@@ -279,13 +268,13 @@ class EnvVar(Generic[T]):
         cls,
         key: str,
         *,
-        default: Optional[float] = None,
-        validator: Optional[EnvVarFnValidatorHint[float]] = None,
+        default: float | None = None,
+        validator: EnvVarFnValidatorHint[float] | None = None,
     ) -> "EnvVar[float]":
-        return cls(
+        return EnvVar(
             key=key,
             default=default,
-            converter=cls.as_converter(float),
+            converter=EnvVar.as_converter(float),
             validator=validator,
         )
 
@@ -294,13 +283,13 @@ class EnvVar(Generic[T]):
         cls,
         key: str,
         *,
-        default: Optional[bool] = None,
+        default: bool | None = None,
         # extra settings
         convert_keys_true: Sequence[str] = ("y", "yes", "t", "true", "1"),
         convert_keys_false: Sequence[str] = ("n", "no", "f", "false", "0"),
         convert_lowercase: bool = True,
         # not really useful for bool, but keep for consistency
-        validator: Optional[EnvVarFnValidatorHint[bool]] = None,
+        validator: EnvVarFnValidatorHint[bool] | None = None,
     ) -> "EnvVar[bool]":
         def convert_bool(value: str) -> bool:
             if convert_lowercase:
@@ -314,7 +303,7 @@ class EnvVar(Generic[T]):
                     f"cannot convert environment variable `{key}={value}` into bool, must be one of: {sorted(list(convert_keys_true) + list(convert_keys_false))}"
                 )
 
-        return cls(
+        return EnvVar(
             key=key,
             default=default,
             converter=convert_bool,

@@ -16,16 +16,13 @@ name = "doorway"
 dynamic = ["version"]  # Version is managed by setuptools_scm
 description = "Essential utilities for working with files, directories, and data."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [{ name = "Nathan Juraj Michlo", email = "NathanJMichlo@gmail.com" }]
 urls = { Homepage = "https://github.com/nmichlo/doorway" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Intended Audience :: Science/Research"
@@ -38,7 +35,7 @@ dependencies = [
 [project.optional-dependencies]
 
 dev = [
-    "pre-commit>=2,<3",
+    "pre-commit>=4",
 ]
 
 test = [
@@ -52,4 +49,64 @@ extras = [
     "cachier",
     "tqdm",
     "beautifulsoup4",
+]
+
+
+# ========================================================================= #
+# RUFF                                                                      #
+# ========================================================================= #
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# `E4/E7/E9 + F` is the ruff default, `I` adds import sorting (previously isort).
+# `UP` modernises syntax for the python floor, including PEP 695 generics.
+# `TID251` enforces the banned-api list below.
+# `B009`/`B010` ban `getattr(x, "const")` / `setattr(x, "const", v)` -- write `x.const`.
+select = ["E4", "E7", "E9", "F", "I", "UP", "TID251", "B009", "B010"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any".msg = "Any disables type checking wherever it appears. Use a precise type, a TypeVar, a Protocol, or a dedicated sentinel class."
+"typing.cast".msg = "cast asserts a type the checker cannot verify. Narrow with isinstance/assert, or fix the annotation."
+
+[tool.ruff.lint.isort]
+# previously `isort --profile=black --force-single-line-imports`
+force-single-line = true
+
+[tool.ruff.lint.per-file-ignores]
+# `__init__.py` files are re-export hubs -- unsorted and "unused" imports are the point.
+"**/__init__.py" = ["F401", "I001"]
+# `_uri.py` monkey-patches the stub-less `rfc3986` module. B010's premise -- "you wrote
+# setattr with a constant, just use attribute access" -- does not hold there: ty types
+# the attribute as the exact function object it holds, so plain attribute assignment
+# cannot type-check for any replacement. See the comment at the patch site.
+"doorway/x/_uri.py" = ["B010"]
+
+
+# ========================================================================= #
+# TY                                                                        #
+# ========================================================================= #
+
+# ty runs as a pre-commit hook and gates CI. it needs the dependencies
+# resolvable and auto-detects `.venv`, so create one first:
+#     uv venv --python 3.12 .venv && uv pip install --python .venv -e ".[extras,test]"
+
+[tool.ty.environment]
+python-version = "3.12"
+
+
+# ========================================================================= #
+# PYTEST                                                                    #
+# ========================================================================= #
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+# usage:
+#   annotation: `@pytest.mark.extra_test`
+#   skip tests: `pytest -m 'not extra_test'`
+markers = [
+    "extra_test: tests that depend on the `extras` optional dependencies",
 ]

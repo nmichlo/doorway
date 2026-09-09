@@ -34,13 +34,11 @@ __all__ = [
 ]
 
 
+import contextlib
 import os
 import sys
-import contextlib
 import warnings
-from typing import Any, Callable
-from typing import Dict
-
+from collections.abc import Callable
 
 # ========================================================================= #
 # context managers -- io streams                                            #
@@ -96,8 +94,8 @@ def ctx_temp_attr(obj, name, value):
 
 @contextlib.contextmanager
 def ctx_do_undo(
-    do: Callable[[], Any],
-    undo: Callable[[], Any],
+    do: Callable[[], object],
+    undo: Callable[[], object],
 ):
     try:
         do()
@@ -132,7 +130,7 @@ def ctx_temp_sys_args(new_argv):
 
 
 @contextlib.contextmanager
-def ctx_temp_environ(environment: Dict[str, Any] = None, **env_kwargs):
+def ctx_temp_environ(environment: dict[str, str] | None = None, **env_kwargs: str):
     # combine the kwargs and the environment dict
     if environment is None:
         environment = {}

@@ -30,11 +30,9 @@ __all__ = [
 
 
 import math
-from typing import Optional
 
 import doorway._colors as c
 from doorway._env_vars import EnvVar
-
 
 # ========================================================================= #
 # Variable Handlers                                                         #
@@ -47,7 +45,7 @@ _VAR_HANDLER_USE_COLORS = EnvVar.env_bool(
 )
 
 
-def fmt_use_colors_get(use_colors: Optional[bool] = None) -> bool:
+def fmt_use_colors_get(use_colors: bool | None = None) -> bool:
     return _VAR_HANDLER_USE_COLORS.get(override=use_colors)
 
 
@@ -91,7 +89,7 @@ def fmt_bytes_to_human(
     base: int = 1024,
     decimals: int = 3,
     align: bool = False,
-    use_colors: Optional[bool] = None,
+    use_colors: bool | None = None,
     round_unit: bool = True,
 ) -> str:
     """
@@ -124,19 +122,13 @@ def fmt_bytes_to_human(
     """
     # check the unit of measurement
     if not isinstance(size_bytes, int):
-        raise TypeError(
-            f"invalid size in bytes, must be of type `int`, got: {type(size_bytes)}"
-        )
+        raise TypeError(f"invalid size in bytes, must be of type `int`, got: {type(size_bytes)}")
     if not isinstance(base, int):
-        raise TypeError(
-            f"invalid bytes base number, must be of type `int`, got: {type(base)}"
-        )
+        raise TypeError(f"invalid bytes base number, must be of type `int`, got: {type(base)}")
     if size_bytes < 0:
         raise ValueError(f"invalid size in bytes, cannot be negative: {size_bytes}")
     if base not in _BYTES_UNIT_NAMES:
-        raise ValueError(
-            f"invalid bytes base number: {repr(base)} must be one of: {sorted(_BYTES_UNIT_NAMES.keys())}"
-        )
+        raise ValueError(f"invalid bytes base number: {repr(base)} must be one of: {sorted(_BYTES_UNIT_NAMES.keys())}")
     units = _BYTES_UNIT_NAMES[base]
 
     # 1. compute power

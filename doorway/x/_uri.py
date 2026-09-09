@@ -46,29 +46,26 @@ __all__ = (
 
 import logging
 import os
+from collections.abc import Callable
+from collections.abc import Iterator
+from collections.abc import Sequence
 from contextlib import contextmanager
 from enum import Enum
 from functools import wraps
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterator,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Concatenate
+from typing import Literal
+from typing import ParamSpec
+from typing import TypeVar
+from typing import Union
+from typing import overload
 
 try:
-    from rfc3986 import normalizers
     from rfc3986 import ParseResult
+    from rfc3986 import normalizers
 except ImportError:
     raise ImportError(
-        "The `rfc3986` package is required for this module. "
-        "You can install it via: `pip install rfc3986`."
+        "The `rfc3986` package is required for this module. You can install it via: `pip install rfc3986`."
     )
 
 
@@ -91,7 +88,12 @@ def _rfc3986_patch_context__remove_dot_segments(
     # -- make sure that '..' and '.' at the start of a path are not removed!
     # -- '' might become '.' which should actually not be allowed!
     if not disabled:
-        normalizers.remove_dot_segments = os.path.normpath
+        # deliberate monkey-patch. `rfc3986` ships no stubs, so ty gives this attribute
+        # the nominal type of the function object it currently holds -- meaning a plain
+        # assignment cannot type-check for ANY replacement, not even one with an
+        # identical signature. `setattr` is the honest way to say "set this
+        # dynamically"; see the `B010` note in pyproject.toml.
+        setattr(normalizers, "remove_dot_segments", os.path.normpath)
     # move into context
     try:
         yield
@@ -120,16 +122,14 @@ class UriFieldValidator:
     def __init__(
         self,
         mode: UriValMode = UriValMode.OPTIONAL,
-        validator: Callable[[ParseResult, str, str, Any], ParseResult] = None,
-        one_of: Optional[Sequence[Any]] = None,
+        validator: Callable[[ParseResult, str, str, object], ParseResult] | None = None,
+        one_of: Sequence[object] | None = None,
     ):
         self._mode = mode
         self._validator = validator
         self._one_of = one_of
 
-    def __call__(
-        self, parsed: ParseResult, uri_kind: str, field_name: str, field_value: Any
-    ) -> None:
+    def __call__(self, parsed: ParseResult, uri_kind: str, field_name: str, field_value: object) -> None:
         # validate based on the mode
         if self._mode == UriValMode.REQUIRED:
             if not field_value:
@@ -167,10 +167,10 @@ class UriValidator:
     validate_query: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
     validate_fragment: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
 
-    def __call__(self, uri: Union[str, Path]) -> ParseResult:
+    def __call__(self, uri: str | Path | ParseResult) -> ParseResult:
         return self.validate(uri)
 
-    def validate(self, uri: Union[str, Path]) -> ParseResult:
+    def validate(self, uri: str | Path | ParseResult) -> ParseResult:
         parsed = uri_parse(uri)
         # validate everything
         self.validate_scheme(
@@ -229,7 +229,7 @@ class UriValidator:
         raise NotImplementedError
 
     @property
-    def allowed_schemes(self) -> Tuple[Optional[str], ...]:
+    def allowed_schemes(self) -> tuple[str | None, ...]:
         raise NotImplementedError
 
     @classmethod
@@ -263,9 +263,7 @@ class UriValidatorUrl(UriValidator):
     allowed_schemes = ("http", "https")
 
     # override these in subclasses
-    validate_scheme: UriFieldValidator = UriFieldValidator(
-        mode=UriValMode.REQUIRED, one_of=allowed_schemes
-    )
+    validate_scheme: UriFieldValidator = UriFieldValidator(mode=UriValMode.REQUIRED, one_of=allowed_schemes)
     validate_userinfo: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
     validate_host: UriFieldValidator = UriFieldValidator(mode=UriValMode.REQUIRED)
     validate_port: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL)
@@ -284,9 +282,7 @@ class UriValidatorFile(UriValidator):
     allowed_schemes = ("file", None)
 
     # override these in subclasses
-    validate_scheme: UriFieldValidator = UriFieldValidator(
-        mode=UriValMode.OPTIONAL, one_of=allowed_schemes
-    )
+    validate_scheme: UriFieldValidator = UriFieldValidator(mode=UriValMode.OPTIONAL, one_of=allowed_schemes)
     validate_userinfo: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
     validate_host: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
     validate_port: UriFieldValidator = UriFieldValidator(mode=UriValMode.FORBIDDEN)
@@ -304,7 +300,7 @@ class UriValidatorFile(UriValidator):
 # ========================================================================= #
 
 
-_SCHEME_VALIDATORS: Dict[Optional[str], UriValidator] = {
+_SCHEME_VALIDATORS: dict[str | None, UriValidator] = {
     scheme: validate_cls()
     for validate_cls in [UriValidatorUrl, UriValidatorFile]
     for scheme in validate_cls.allowed_schemes
@@ -316,24 +312,26 @@ _SCHEME_VALIDATORS: Dict[Optional[str], UriValidator] = {
 # ========================================================================= #
 
 
-def uri_parse(
-    uri: Union[str, Path, ParseResult], rfc3986_norm: bool = False
-) -> ParseResult:
+def uri_parse(uri: str | Path | ParseResult, rfc3986_norm: bool = False) -> ParseResult:
     parsed = uri
     # convert to parse result
     # -- assume already normalized if already a ParseResult
     if not isinstance(parsed, ParseResult):
         with _rfc3986_patch_context__remove_dot_segments(disabled=rfc3986_norm):
-            parsed: ParseResult = ParseResult.from_string(
-                str(parsed), lazy_normalize=False
-            )
+            parsed: ParseResult = ParseResult.from_string(str(parsed), lazy_normalize=False)
     # done!
     return parsed
 
 
+@overload
+def uri_validate(uri: str | Path | ParseResult, return_validator: Literal[False] = False) -> ParseResult: ...
+@overload
 def uri_validate(
-    uri: Union[str, Path], return_validator: bool = False
-) -> Union[ParseResult, Tuple[ParseResult, UriValidator]]:
+    uri: str | Path | ParseResult, return_validator: Literal[True]
+) -> tuple[ParseResult, UriValidator]: ...
+def uri_validate(
+    uri: str | Path | ParseResult, return_validator: bool = False
+) -> ParseResult | tuple[ParseResult, UriValidator]:
     parsed = uri_parse(uri)
     # get the validator
     validator = _SCHEME_VALIDATORS.get(parsed.scheme, None)
@@ -350,28 +348,22 @@ def uri_validate(
 
 
 def uri_extract(
-    uri: Union[str, Path],
+    uri: str | Path | ParseResult,
     return_validated: bool = False,
     return_validator: bool = False,
-) -> Union[
-    str,
-    Tuple[str, ParseResult],
-    Tuple[str, UriValidator],
-    Tuple[str, ParseResult, UriValidator],
-]:
+) -> str | tuple[str, ParseResult] | tuple[str, UriValidator] | tuple[str, ParseResult, UriValidator]:
     validated, validator = uri_validate(uri, return_validator=True)
     # validate the uri
     uri_norm = validator.extract(validated)
     # return the single result
-    if not (return_validator or return_validated):
+    if return_validated and return_validator:
+        return uri_norm, validated, validator
+    elif return_validated:
+        return uri_norm, validated
+    elif return_validator:
+        return uri_norm, validator
+    else:
         return uri_norm
-    # return all the results
-    results = [uri_norm]
-    if return_validated:
-        results.append(validated)
-    if return_validator:
-        results.append(validator)
-    return tuple(results)
 
 
 # ========================================================================= #
@@ -379,7 +371,8 @@ def uri_extract(
 # ========================================================================= #
 
 
-T = TypeVar("T")
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 
 class UriIsIncorrectTypeError(Exception):
@@ -388,13 +381,19 @@ class UriIsIncorrectTypeError(Exception):
     """
 
 
-def _only_if(prop: property) -> Callable[[T], T]:
-    def decorator(func: T) -> T:
+def _only_if(
+    prop: property,
+) -> Callable[[Callable[Concatenate["Uri", _P], _R]], Callable[Concatenate["Uri", _P], _R]]:
+    def decorator(func: Callable[Concatenate["Uri", _P], _R]) -> Callable[Concatenate["Uri", _P], _R]:
         @wraps(func)
-        def wrapper(self: "Uri", *args, **kwargs):
-            if getattr(self, prop.fget.__name__):
+        def wrapper(self: "Uri", *args: _P.args, **kwargs: _P.kwargs) -> _R:
+            fget = prop.fget
+            assert fget is not None, f"property {prop} has no getter, this is a bug!"
+            fget_name = getattr(fget, "__name__", repr(fget))
+            func_name = getattr(func, "__name__", repr(func))
+            if prop.__get__(self):
                 raise UriIsIncorrectTypeError(
-                    f"Check if: `{prop.fget.__name__}` is `True` before calling `{func.__name__}`, got uri: {repr(self.uri)}"
+                    f"Check if: `{fget_name}` is `True` before calling `{func_name}`, got uri: {repr(self.uri)}"
                 )
             return func(self, *args, **kwargs)
 
@@ -408,14 +407,14 @@ def _only_if(prop: property) -> Callable[[T], T]:
 # ========================================================================= #
 
 
-class Uri(object):
+class Uri:
     def __init__(self, uri: Union[str, Path, ParseResult, "Uri"]):
         # unwrap uri object
         if isinstance(uri, Uri):
             uri = uri._input_uri
             assert not isinstance(uri, Uri)
         # save the input
-        self._input_uri: Union[str, Path, ParseResult] = uri
+        self._input_uri: str | Path | ParseResult = uri
         # get validated uri
         validated, validator = uri_validate(uri, return_validator=True)
         self._validated: ParseResult = validated
