@@ -77,7 +77,6 @@ LOG = logging.getLogger(__name__)
 # ========================================================================= #
 
 
-_ATTR_REMOVE_DOT_SEGMENTS = "remove_dot_segments"
 _ORIG_REMOVE_DOT_SEGMENTS = normalizers.remove_dot_segments
 
 
@@ -89,11 +88,12 @@ def _rfc3986_patch_context__remove_dot_segments(
     # -- make sure that '..' and '.' at the start of a path are not removed!
     # -- '' might become '.' which should actually not be allowed!
     if not disabled:
-        # `rfc3986` ships no type stubs, so `normalizers.remove_dot_segments` is inferred with the
-        # narrow signature of the function being replaced -- use `setattr` (via a non-literal
-        # attribute name, since `B010` would otherwise rewrite this back to a plain assignment)
-        # to sidestep that for this deliberate monkey-patch of a 3rd-party, untyped module.
-        setattr(normalizers, _ATTR_REMOVE_DOT_SEGMENTS, os.path.normpath)
+        # deliberate monkey-patch. `rfc3986` ships no stubs, so ty gives this attribute
+        # the nominal type of the function object it currently holds -- meaning a plain
+        # assignment cannot type-check for ANY replacement, not even one with an
+        # identical signature. `setattr` is the honest way to say "set this
+        # dynamically"; see the `B010` note in pyproject.toml.
+        setattr(normalizers, "remove_dot_segments", os.path.normpath)
     # move into context
     try:
         yield

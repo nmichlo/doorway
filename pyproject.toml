@@ -78,6 +78,11 @@ force-single-line = true
 [tool.ruff.lint.per-file-ignores]
 # `__init__.py` files are re-export hubs -- unsorted and "unused" imports are the point.
 "**/__init__.py" = ["F401", "I001"]
+# `_uri.py` monkey-patches the stub-less `rfc3986` module. B010's premise -- "you wrote
+# setattr with a constant, just use attribute access" -- does not hold there: ty types
+# the attribute as the exact function object it holds, so plain attribute assignment
+# cannot type-check for any replacement. See the comment at the patch site.
+"doorway/x/_uri.py" = ["B010"]
 
 
 # ========================================================================= #
