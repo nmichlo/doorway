@@ -24,10 +24,12 @@ jobs:
       # value here would arrive as three separate arguments.
       markers: "not extra_test"
       coverage: "doorway"
-    secrets:
-      # named rather than `secrets: inherit`, which hands the called workflow
-      # every secret this repo has, including ones it has no business seeing.
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    # codecov uploads over OIDC, so there is no CODECOV_TOKEN. a reusable
+    # workflow cannot hold more permission than its caller, so the grant has to
+    # be here.
+    permissions:
+      contents: read
+      id-token: write
 
   extras:
     uses: nmichlo/.github/.github/workflows/pytest.yaml@main
@@ -36,10 +38,12 @@ jobs:
       install-extras: "extras,test"
       pytest-args: "--color=yes --verbose"
       coverage: "doorway"
-    secrets:
-      # named rather than `secrets: inherit`, which hands the called workflow
-      # every secret this repo has, including ones it has no business seeing.
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    # codecov uploads over OIDC, so there is no CODECOV_TOKEN. a reusable
+    # workflow cannot hold more permission than its caller, so the grant has to
+    # be here.
+    permissions:
+      contents: read
+      id-token: write
 
   # The branch-protection gate; see nmichlo/.github/actions/gate for why it
   # exists. `always()` is required, or the gate is skipped when what it guards
